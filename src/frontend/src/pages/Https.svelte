@@ -36,9 +36,21 @@
     <span class="pill" class:on={m.etat === 'actif'}>{m.etat === 'actif' ? 'Certificat actif' : 'Hors ligne'}</span>
   </div>
   <p class="page-intro">
-    Aria obtient et renouvelle seule un vrai certificat Let's Encrypt pour ton sous-domaine DuckDNS. L'appli Bitwarden pour
+    Aria obtient et renouvelle seule un vrai certificat Let's Encrypt pour ton nom de domaine. L'appli Bitwarden pour
     Android refuse les certificats faits maison : c'est ce qui la rend compatible.
   </p>
+  <p class="page-intro">
+    Pas de nom de domaine ? <strong>DuckDNS</strong> t'en offre un gratuitement en deux minutes (exemple.duckdns.org) :
+    c'est le fournisseur que gère Aria aujourd'hui.
+  </p>
+
+  <aside class="callout" aria-label="Adresse IP fixe">
+    <span class="callout-title">Garde la même adresse IP</span>
+    <span>
+      Ton domaine pointe vers l'adresse locale de ce PC. Si elle change, ton téléphone ne trouve plus le coffre : réserve-la
+      pour ce PC dans l'interface de ta box (section DHCP, « bail statique » ou « adresse réservée »).
+    </span>
+  </aside>
 
   <div class="grid-2">
     <section class="card">
@@ -109,7 +121,7 @@
 
       <span class="eyebrow">Comment ça marche</span>
       <ol class="how">
-        <li>Sur duckdns.org, ton sous-domaine pointe vers l'adresse <strong>privée</strong> de ce PC (192.168.x.x).</li>
+        <li>Ton domaine pointe vers l'adresse <strong>privée</strong> de ce PC (192.168.x.x), qui doit rester fixe.</li>
         <li>Aria prouve à Let's Encrypt qu'il contrôle le domaine par un enregistrement DNS (DNS-01) : aucun port à ouvrir sur la box.</li>
         <li>Hors de chez toi, ton téléphone passe par ton VPN.</li>
       </ol>
@@ -118,6 +130,35 @@
 </div>
 
 <style>
+  .page-intro strong {
+    color: var(--text);
+    font-weight: 500;
+  }
+  .page-intro + .page-intro {
+    margin-top: -12px;
+  }
+  .callout {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    max-width: 760px;
+    padding: 12px 14px;
+    border-left: 3px solid var(--action);
+    border-radius: 0 10px 0 0;
+    corner-shape: bevel;
+    background: color-mix(in srgb, var(--action) 8%, transparent);
+    font-size: 13px;
+    line-height: 1.6;
+    color: var(--muted);
+  }
+  .callout-title {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: var(--action);
+  }
   .optional {
     color: var(--faint);
     font-weight: 400;

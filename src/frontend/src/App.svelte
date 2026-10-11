@@ -28,7 +28,7 @@
 <div class="shell">
   <nav class="sidebar" aria-label="Sections">
     <div class="brand">
-      <Logo size={38} dim={etat !== 'actif'} />
+      <Logo size={56} dim={etat !== 'actif'} />
       <span class="brand-name label"><span class="brand-top">ARIA</span><span class="brand-sub">VAULT</span></span>
     </div>
 
@@ -62,13 +62,18 @@
     <div class="sidebar-foot">
       <button
         class="open"
-        disabled={!app.status?.domaine || app.busy}
+        class:live={etat === 'actif'}
+        disabled={etat !== 'actif' || app.busy}
         aria-label="Ouvrir le coffre dans le navigateur"
-        title={app.status?.domaine ? `https://${app.status.domaine}` : 'Configure d\'abord HTTPS'}
+        title={etat === 'actif' ? `https://${app.status.domaine}` : 'Le serveur doit être en ligne'}
         onclick={openVault}
       >
-        <span class="nav-icon"><Icon name="external" size={18} /></span>
-        <span class="label">ouvrir --coffre</span>
+        <span class="open-icon"><Icon name="vault" size={22} /></span>
+        <span class="open-text label">
+          <span class="open-title">Ouvrir le coffre</span>
+          <span class="open-sub">{etat === 'actif' ? app.status.domaine : 'serveur hors ligne'}</span>
+        </span>
+        <span class="open-arrow label" aria-hidden="true">↗</span>
       </button>
       <span class="version label">aria-vaultwarden {version ? `v${version}` : ''}</span>
     </div>
@@ -97,7 +102,7 @@
 <style>
   .shell {
     display: grid;
-    grid-template-columns: 216px minmax(0, 1fr);
+    grid-template-columns: 240px minmax(0, 1fr);
     height: 100vh;
   }
 
@@ -113,9 +118,9 @@
   .brand {
     display: flex;
     align-items: center;
-    gap: 10px;
-    padding: 0 4px;
-    min-height: 40px;
+    gap: 12px;
+    padding: 2px 4px 6px;
+    min-height: 58px;
   }
   .brand-name {
     display: flex;
@@ -125,13 +130,14 @@
   .brand-top {
     font-family: var(--font-display);
     font-weight: 700;
-    font-size: 17px;
+    font-size: 26px;
     color: #ffffff;
-    letter-spacing: 0.5px;
+    letter-spacing: 1px;
+    text-shadow: -2px 0 0 color-mix(in srgb, var(--accent) 55%, transparent), 2px 0 0 color-mix(in srgb, var(--accent-2) 55%, transparent);
   }
   .brand-sub {
-    font-size: 11px;
-    letter-spacing: 3px;
+    font-size: 14px;
+    letter-spacing: 5px;
     color: var(--accent);
   }
 
@@ -215,26 +221,70 @@
     gap: 8px;
   }
   .open {
-    min-height: 40px;
-    padding: 0 10px;
     display: flex;
     align-items: center;
-    justify-content: center;
-    gap: 8px;
+    gap: 10px;
+    min-height: 58px;
+    padding: 8px 12px;
     border: 1px solid var(--line-strong);
-    border-radius: 8px 0;
+    border-radius: 12px 0;
     corner-shape: bevel;
-    background: transparent;
-    color: var(--text);
-    font-family: var(--font-mono);
-    font-size: 13px;
+    background: var(--surface);
+    color: var(--muted);
+    text-align: left;
+    transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
   }
-  .open:hover:not(:disabled) {
-    border-color: var(--action);
-    color: var(--action);
+  .open.live {
+    border-color: color-mix(in srgb, var(--accent) 55%, transparent);
+    background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 12%, var(--surface)), color-mix(in srgb, var(--accent-2) 10%, var(--surface)));
+    color: var(--text);
+  }
+  .open.live:hover {
+    border-color: var(--accent);
+    box-shadow: 0 0 18px color-mix(in srgb, var(--accent) 35%, transparent), inset 0 0 12px color-mix(in srgb, var(--accent) 12%, transparent);
   }
   .open:disabled {
-    opacity: 0.45;
+    cursor: not-allowed;
+  }
+  .open-icon {
+    flex: none;
+    display: flex;
+    color: var(--faint);
+  }
+  .open.live .open-icon {
+    color: var(--accent);
+    filter: drop-shadow(0 0 4px var(--accent));
+  }
+  .open-text {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .open-title {
+    font-family: var(--font-display);
+    font-size: 15px;
+    font-weight: 600;
+  }
+  .open-sub {
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    color: var(--faint);
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .open-arrow {
+    flex: none;
+    font-size: 18px;
+    color: var(--dim);
+    transition: transform 0.2s, color 0.2s;
+  }
+  .open.live .open-arrow {
+    color: var(--action);
+  }
+  .open.live:hover .open-arrow {
+    transform: translate(2px, -2px);
   }
   .version {
     padding: 0 4px;
@@ -276,6 +326,10 @@
       padding: 0;
       width: 48px;
       min-height: 48px;
+    }
+    .brand :global(svg) {
+      width: 44px;
+      height: 44px;
     }
     .nav {
       align-items: center;

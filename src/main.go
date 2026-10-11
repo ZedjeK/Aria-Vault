@@ -96,12 +96,12 @@ func main() {
 			return
 		}
 		s := svc.moteur.Status()
-		icon, tip, action := trayOff, "Aria Vaultwarden · coffre arrêté", "Démarrer le coffre"
+		icon, tip, action := trayOff, "Aria Vaultwarden · serveur arrêté", "Démarrer le serveur"
 		switch s.Etat {
 		case moteur.Actif:
-			icon, tip, action = trayOn, "Aria Vaultwarden · en ligne : "+s.Domaine, "Arrêter le coffre"
+			icon, tip, action = trayOn, "Aria Vaultwarden · en ligne : "+s.Domaine, "Arrêter le serveur"
 		case moteur.Demarrage:
-			tip, action = "Aria Vaultwarden · démarrage…", "Arrêter le coffre"
+			tip, action = "Aria Vaultwarden · démarrage…", "Arrêter le serveur"
 		case moteur.Erreur:
 			tip = "Aria Vaultwarden · erreur : " + s.Detail
 		}
@@ -142,7 +142,7 @@ func main() {
 		}
 	})
 	menu.AddSeparator()
-	toggle = menu.Add("Démarrer le coffre").OnClick(func(*application.Context) {
+	toggle = menu.Add("Démarrer le serveur").OnClick(func(*application.Context) {
 		go func() {
 			switch svc.moteur.Status().Etat {
 			case moteur.Actif, moteur.Demarrage:
@@ -156,7 +156,7 @@ func main() {
 		}()
 	})
 	menu.AddSeparator()
-	menu.Add("Quitter (arrête le coffre)").OnClick(func(*application.Context) { app.Quit() })
+	menu.Add("Quitter (arrête le serveur)").OnClick(func(*application.Context) { app.Quit() })
 
 	tray = app.SystemTray.New()
 	tray.SetMenu(menu)

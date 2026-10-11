@@ -1,6 +1,6 @@
 <script>
   import Logo from '../lib/Logo.svelte'
-  import { app, start, stop, openVault, formatDate, formatSince, daysLeft } from '../lib/state.svelte.js'
+  import { app, formatDate, formatSince, daysLeft } from '../lib/state.svelte.js'
 
   const st = $derived(app.status)
   const m = $derived(st?.moteur ?? { etat: 'arrete' })
@@ -52,8 +52,6 @@
 </script>
 
 <div class="page">
-  <h1 class="cmd"><span class="cwd">~/aria</span> $ statut</h1>
-
   <section class="hero" aria-label="État du coffre">
     <div class="hero-text">
       <span class="eyebrow">État du coffre</span>
@@ -64,11 +62,12 @@
         {:else if etat === 'demarrage'}
           En cours : {m.detail}…
         {:else if etat === 'erreur'}
-          {m.detail}
+          {m.detail}. Détails dans le journal ; relance le serveur depuis Réglages.
         {:else if !configure}
-          Commence par la page HTTPS : ton sous-domaine DuckDNS et son jeton suffisent.
+          Commence par la page HTTPS : ton nom de domaine et son jeton suffisent.
         {:else}
-          Le coffre est arrêté : ton téléphone garde sa copie hors ligne, mais ne peut plus se synchroniser.
+          Le serveur est arrêté : ton téléphone garde sa copie hors ligne, mais ne peut plus se synchroniser. Démarre-le
+          depuis Réglages, ou d'un clic droit sur l'icône Aria dans la zone de notification.
         {/if}
       </p>
     </div>
@@ -77,7 +76,7 @@
     </div>
   </section>
 
-  <div class="bottom">
+  <div class="bottom" class:single={configure}>
     <section class="card" aria-label="Moteurs">
       <h2>Moteurs</h2>
       <div class="lines">
@@ -97,43 +96,17 @@
       </div>
     </section>
 
-    <section class="control" aria-label="Contrôle">
-      <span class="eyebrow">Contrôle</span>
-      <div class="cta-zone">
-        {#if !configure}
-          <button class="cta" onclick={() => (app.page = 'https')}>configurer https</button>
-          <p class="hint">Domaine DuckDNS et jeton : c'est tout ce qu'il faut.</p>
-        {:else if etat === 'actif' || etat === 'demarrage'}
-          <button class="btn-ghost" onclick={openVault} disabled={app.busy || etat !== 'actif'}>ouvrir le coffre ↗</button>
-          <button class="cta" onclick={stop} disabled={app.busy}>{app.busy ? 'arrêt…' : 'arrêter le coffre'}</button>
-          <p class="hint">Fermer la fenêtre ne l'arrête pas : Aria reste dans la zone de notification.</p>
-        {:else}
-          <button class="cta" onclick={start} disabled={app.busy}>{app.busy ? 'démarrage…' : etat === 'erreur' ? 'réessayer' : 'démarrer le coffre'}</button>
-          {#if etat === 'erreur'}
-            <button class="btn-ghost" onclick={() => (app.page = 'journal')}>voir le journal</button>
-          {/if}
-        {/if}
-        {#if app.error}
-          <p class="error" role="alert">{app.error}</p>
-        {/if}
-      </div>
-    </section>
+    {#if !configure}
+      <section class="control" aria-label="Premiers pas">
+        <span class="eyebrow">Premiers pas</span>
+        <button class="cta" onclick={() => (app.page = 'https')}>configurer https</button>
+        <p class="hint">Un nom de domaine et son jeton : c'est tout ce qu'il faut.</p>
+      </section>
+    {/if}
   </div>
 </div>
 
 <style>
-  .cmd {
-    margin: 0;
-    font-family: var(--font-mono);
-    font-size: 13px;
-    font-weight: 400;
-    color: var(--faint);
-  }
-  .cwd {
-    color: var(--action);
-    margin-right: 6px;
-  }
-
   .hero {
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto;
@@ -201,7 +174,7 @@
     gap: 16px;
   }
   @container (min-width: 640px) {
-    .bottom {
+    .bottom:not(.single) {
       grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
     }
   }
@@ -302,14 +275,9 @@
   .control {
     display: flex;
     flex-direction: column;
+    justify-content: center;
     gap: 12px;
     min-width: 0;
-  }
-  .cta-zone {
-    margin-top: auto;
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
   }
   .cta {
     width: 100%;
