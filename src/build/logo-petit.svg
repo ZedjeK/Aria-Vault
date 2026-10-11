@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 160" width="32" height="32">
-  <!-- Variante lisible en 16 à 32 px (barre des tâches) : traits épais, sans cadre intérieur. -->
+  <!-- Variante lisible en 16 à 48 px (barre des tâches) : traits épais, mallette simplifiée. -->
   <defs>
     <polygon id="a" points="28,138 68,24 92,24 132,138 108,138 80,58 52,138"/>
     <clipPath id="bl"><rect x="0" y="76" width="80" height="90"/></clipPath>
@@ -12,6 +12,12 @@
     <g clip-path="url(#br)" stroke="#5C8BFF"><use href="#a"/></g>
     <g transform="translate(8,0)"><g clip-path="url(#t)" stroke="#FFFFFF"><use href="#a"/></g></g>
   </g>
-  <circle cx="80" cy="103" r="9" fill="#FF8A1F"/>
-  <polygon points="75.5,107 84.5,107 89,136 71,136" fill="#FF8A1F"/>
+  <!-- Contour sombre : sépare la mallette des jambes du A en petit format -->
+  <g stroke="#030812" stroke-width="7" stroke-linejoin="round" fill="#030812">
+    <path d="M71,102 v-8 a4 4 0 0 1 4,-4 h10 a4 4 0 0 1 4,4 v8" fill="none"/>
+    <rect x="61" y="101" width="38" height="28" rx="5"/>
+  </g>
+  <path d="M71,102 v-8 a4 4 0 0 1 4,-4 h10 a4 4 0 0 1 4,4 v8" fill="none" stroke="#FF8A1F" stroke-width="5"/>
+  <rect x="61" y="101" width="38" height="28" rx="5" fill="#FF8A1F"/>
+  <rect x="61" y="112.5" width="38" height="3.5" fill="#030812" opacity="0.6"/>
 </svg>

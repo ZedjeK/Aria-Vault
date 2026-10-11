@@ -1,5 +1,5 @@
 <script>
-  // Logo d'Aria Vaultwarden : le A glitché de la famille Aria, avec un trou de serrure orange.
+  // Logo d'Aria Vault : le A glitché de la famille Aria, avec la mallette blindée orange.
   // Chaque instance a ses propres identifiants SVG (découpes, filtres).
   let { size = 36, dim = false, label = '' } = $props()
 
@@ -21,10 +21,6 @@
       <rect width="4" height="1.5" fill="#7DF9FF" opacity="0.07" />
     </pattern>
     <polygon id={ref('a')} points="30,130 70,30 90,30 130,130 110,130 80,54 50,130" />
-    <g id={ref('k')}>
-      <circle cx="80" cy="98" r="7.5" />
-      <polygon points="76.5,102 83.5,102 87,118 73,118" />
-    </g>
     <clipPath id={ref('bl')}><rect x="0" y="72" width="80" height="90" /></clipPath>
     <clipPath id={ref('br')}><rect x="80" y="72" width="80" height="90" /></clipPath>
     <clipPath id={ref('t')}><rect x="0" y="0" width="160" height="72" /></clipPath>
@@ -56,11 +52,17 @@
         <g clip-path="url(#{ref('t')})" fill="none" stroke="#FFFFFF" stroke-width="4"><use href="#{ref('a')}" /></g>
       </g>
     </g>
-    <use href="#{ref('k')}" fill="#7DF9FF" opacity="0.55" transform="translate(-3,0)" />
-    <use href="#{ref('k')}" fill="#5C8BFF" opacity="0.55" transform="translate(3,0)" />
   </g>
-  <!-- La serrure reste orange même quand le logo est éteint : Aria veille. -->
-  <use href="#{ref('k')}" fill="#FF8A1F" filter="url(#{ref('g2')})" />
+  <!-- La mallette reste orange même quand le logo est éteint : Aria veille. -->
+  <g transform="translate(80 104) scale(1.18) translate(-80 -104)" filter="url(#{ref('g2')})">
+    <path d="M74,96 v-4.5 a2 2 0 0 1 2,-2 h8 a2 2 0 0 1 2,2 v4.5" fill="none" stroke="#FF8A1F" stroke-width="2.4" />
+    <rect x="65" y="96" width="30" height="22" rx="3" fill="#FF8A1F" />
+    <g fill="#030812" opacity="0.6">
+      <rect x="65" y="104.5" width="30" height="1.8" />
+      <rect x="70" y="99.5" width="4" height="3" rx="0.8" />
+      <rect x="86" y="99.5" width="4" height="3" rx="0.8" />
+    </g>
+  </g>
 </svg>
 
 <style>
@@ -71,7 +73,7 @@
   .a-part {
     transition: filter 0.3s, opacity 0.3s;
   }
-  /* Éteint : le A s'efface, la serrure orange reste allumée */
+  /* Éteint : le A s'efface, la mallette orange reste allumée */
   .dim .a-part {
     filter: saturate(0.3);
     opacity: 0.5;
