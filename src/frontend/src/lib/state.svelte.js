@@ -11,6 +11,7 @@ export const app = $state({
   busy: false,
   error: '', // erreur de la dernière action
   journal: [],
+  backups: null, // page Sauvegardes
 })
 
 export async function refresh() {
@@ -89,4 +90,45 @@ export function formatSince(iso) {
 export function daysLeft(iso) {
   if (!valid(iso)) return null
   return Math.floor((new Date(iso) - Date.now()) / 86400000)
+}
+
+// ---------- Sauvegardes ----------
+
+export async function loadBackups() {
+  try {
+    app.backups = await call('Backups')
+  } catch (err) {
+    app.error = message(err)
+  }
+}
+
+async function runBackup(fn) {
+  const res = await run(fn)
+  await loadBackups()
+  return res
+}
+
+export const backupNow = () => runBackup(() => call('Backup'))
+export const restoreBackup = (nom) => runBackup(() => call('Restore', nom))
+export const importVault = () => runBackup(() => call('ImportVault'))
+export const chooseBackupFolder = () => runBackup(() => call('ChooseBackupFolder'))
+export const openBackupFolder = () => run(() => call('OpenBackupFolder'))
+export const setDailyBackup = (on) => runBackup(() => call('SetDailyBackup', on))
+export const exportSettings = (phrase) => run(() => call('ExportSettings', phrase))
+
+export async function importSettings(phrase) {
+  const res = await run(() => call('ImportSettings', phrase))
+  if (res?.error) app.error = res.error
+  return res
+}
+
+export function formatDateHeure(iso) {
+  if (!valid(iso)) return ''
+  return new Date(iso).toLocaleString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+}
+
+export function formatTaille(n) {
+  if (n >= 1 << 20) return `${(n / (1 << 20)).toFixed(1).replace('.', ',')} Mo`
+  if (n >= 1 << 10) return `${Math.round(n / (1 << 10))} Ko`
+  return `${n} o`
 }

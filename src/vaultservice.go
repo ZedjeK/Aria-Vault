@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"strings"
+	"sync"
 
 	"github.com/wailsapp/wails/v3/pkg/application"
 
@@ -19,6 +20,9 @@ type VaultService struct {
 	j      *journal.Journal
 	moteur *moteur.Moteur
 	app    *application.App // renseigné après application.New
+
+	cfgMu sync.Mutex // protège config.json (lecture-modification-écriture)
+	svgMu sync.Mutex // une seule sauvegarde ou restauration à la fois
 }
 
 // View est l'état complet affiché par l'interface.
@@ -46,7 +50,7 @@ func (s *VaultService) Status() View {
 		Donnees:     s.p.Donnees,
 		Base:        s.p.Base,
 	}
-	cfg, err := config.Load(s.p.Config)
+	cfg, err := s.lireConfig()
 	if err != nil {
 		v.Erreur = err.Error()
 	} else {
@@ -79,6 +83,13 @@ type SaveResult struct {
 // SaveConfig enregistre la configuration HTTPS et relance le coffre s'il tournait.
 func (s *VaultService) SaveConfig(in ConfigInput) SaveResult {
 	res := SaveResult{Fields: map[string]string{}}
+	s.cfgMu.Lock()
+	enregistre := false
+	defer func() {
+		if !enregistre {
+			s.cfgMu.Unlock()
+		}
+	}()
 	cfg, err := config.Load(s.p.Config)
 	if err != nil {
 		res.Error = err.Error()
@@ -107,7 +118,10 @@ func (s *VaultService) SaveConfig(in ConfigInput) SaveResult {
 		return res
 	}
 
-	if err := cfg.Save(s.p.Config); err != nil {
+	err = cfg.Save(s.p.Config)
+	enregistre = true
+	s.cfgMu.Unlock()
+	if err != nil {
 		res.Error = err.Error()
 		return res
 	}
@@ -129,12 +143,7 @@ func (s *VaultService) Restart() error { return s.moteur.Restart() }
 
 // SetInscriptions ouvre ou ferme la création de comptes.
 func (s *VaultService) SetInscriptions(on bool) error {
-	cfg, err := config.Load(s.p.Config)
-	if err != nil {
-		return err
-	}
-	cfg.Inscriptions = on
-	if err := cfg.Save(s.p.Config); err != nil {
+	if err := s.majConfig(func(c *config.Config) { c.Inscriptions = on }); err != nil {
 		return err
 	}
 	if on {
@@ -163,7 +172,7 @@ func (s *VaultService) SetAutostart(on bool) error {
 
 // OpenVault ouvre le coffre web dans le navigateur.
 func (s *VaultService) OpenVault() error {
-	cfg, err := config.Load(s.p.Config)
+	cfg, err := s.lireConfig()
 	if err != nil {
 		return err
 	}

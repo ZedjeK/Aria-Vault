@@ -28,6 +28,12 @@ func Default() (Paths, error) {
 	return In(filepath.Join(root, "AriaVaultwarden")), nil
 }
 
+// SauvegardesParDefaut est le dossier proposé pour les sauvegardes :
+// Documents\Aria Vault\Sauvegardes (Documents suit une redirection OneDrive).
+func SauvegardesParDefaut() string {
+	return filepath.Join(documents(), "Aria Vault", "Sauvegardes")
+}
+
 // In construit les emplacements à partir d'un dossier de base.
 func In(base string) Paths {
 	return Paths{

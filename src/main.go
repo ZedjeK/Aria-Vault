@@ -8,6 +8,7 @@
 package main
 
 import (
+	"context"
 	"embed"
 	"log"
 	"os"
@@ -62,6 +63,7 @@ func main() {
 		toggle *application.MenuItem
 	)
 	svc := &VaultService{p: p, j: j}
+	ctx, arreter := context.WithCancel(context.Background())
 
 	montrer := func() {
 		if window == nil {
@@ -85,8 +87,11 @@ func main() {
 				application.InvokeAsync(montrer)
 			},
 		},
-		Windows:    application.WindowsOptions{DisableQuitOnLastWindowClosed: true},
-		OnShutdown: func() { svc.moteur.Stop() },
+		Windows: application.WindowsOptions{DisableQuitOnLastWindowClosed: true},
+		OnShutdown: func() {
+			arreter()
+			svc.moteur.Stop()
+		},
 	})
 	svc.app = app
 
@@ -116,12 +121,12 @@ func main() {
 	configure := svc.moteur.Configure()
 
 	window = app.Window.NewWithOptions(application.WebviewWindowOptions{
-		Name:             "main",
-		Title:            "Aria Vaultwarden",
-		Width:            980,
-		Height:           640,
-		MinWidth:         420,
-		MinHeight:        520,
+		Name:      "main",
+		Title:     "Aria Vaultwarden",
+		Width:     980,
+		Height:    640,
+		MinWidth:  420,
+		MinHeight: 520,
 		// Sans configuration, rien à servir : la fenêtre s'ouvre même en mode silencieux.
 		Hidden:           silencieux && configure,
 		BackgroundColour: application.NewRGB(3, 8, 18),
@@ -155,6 +160,9 @@ func main() {
 			}
 		}()
 	})
+	menu.Add("Sauvegarder maintenant").OnClick(func(*application.Context) {
+		go func() { _, _ = svc.Backup() }() // le résultat arrive dans le journal
+	})
 	menu.AddSeparator()
 	menu.Add("Quitter (arrête le serveur)").OnClick(func(*application.Context) { app.Quit() })
 
@@ -167,6 +175,7 @@ func main() {
 	// Le coffre démarre une fois l'appli lancée (l'icône doit exister pour suivre son état).
 	app.Event.OnApplicationEvent(events.Common.ApplicationStarted, func(*application.ApplicationEvent) {
 		majTray()
+		go svc.boucleQuotidienne(ctx)
 		if configure {
 			go func() {
 				if err := svc.moteur.Start(); err != nil {

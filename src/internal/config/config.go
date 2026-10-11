@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"time"
 )
 
 // Config est le contenu de config.json.
@@ -19,6 +20,11 @@ type Config struct {
 	JetonChiffre []byte `json:"jetonDuckDNS,omitempty"` // DPAPI, encodé en base64 dans le JSON
 	Email        string `json:"email,omitempty"`        // facultatif : avertissements Let's Encrypt
 	Inscriptions bool   `json:"inscriptions,omitempty"` // création de comptes autorisée
+
+	// Sauvegardes du coffre
+	DossierSauvegarde  string    `json:"dossierSauvegarde,omitempty"`  // vide = dossier par défaut
+	SansSauvegardeAuto bool      `json:"sansSauvegardeAuto,omitempty"` // la quotidienne est active par défaut
+	DerniereSauvegarde time.Time `json:"derniereSauvegarde,omitzero"`
 }
 
 // Load lit config.json. Un fichier absent donne une configuration vide.

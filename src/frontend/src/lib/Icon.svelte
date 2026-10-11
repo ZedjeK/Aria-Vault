@@ -12,6 +12,8 @@
     <path d="M4 7h10" /><path d="M18 7h2" /><circle cx="16" cy="7" r="2" /><path d="M4 17h2" /><path d="M10 17h10" /><circle cx="8" cy="17" r="2" />
   {:else if name === 'journal'}
     <path d="M9 6h11" /><path d="M9 12h11" /><path d="M9 18h11" /><path d="M4 6h.01" /><path d="M4 12h.01" /><path d="M4 18h.01" />
+  {:else if name === 'backup'}
+    <rect x="3" y="4" width="18" height="5" rx="1.5" /><path d="M5 9v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V9" /><path d="M10 13h4" />
   {:else if name === 'vault'}
     <rect x="3" y="4" width="18" height="15" rx="2" /><circle cx="12" cy="11.5" r="4" /><path d="M12 9.5v2l1.5 1" /><path d="M6 19v2" /><path d="M18 19v2" />
   {:else if name === 'external'}

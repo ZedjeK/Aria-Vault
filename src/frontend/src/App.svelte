@@ -6,11 +6,13 @@
   import Home from './pages/Home.svelte'
   import Https from './pages/Https.svelte'
   import Reglages from './pages/Reglages.svelte'
+  import Sauvegardes from './pages/Sauvegardes.svelte'
   import Journal from './pages/Journal.svelte'
 
   const nav = [
     { id: 'home', label: 'Accueil', cmd: 'accueil', icon: 'home' },
     { id: 'https', label: 'HTTPS', cmd: 'https', icon: 'lock' },
+    { id: 'sauvegardes', label: 'Sauvegardes', cmd: 'sauvegardes', icon: 'backup' },
     { id: 'reglages', label: 'Réglages', cmd: 'réglages', icon: 'settings' },
     { id: 'journal', label: 'Journal', cmd: 'journal', icon: 'journal' },
   ]
@@ -91,6 +93,8 @@
       <Home />
     {:else if app.page === 'https'}
       <Https />
+    {:else if app.page === 'sauvegardes'}
+      <Sauvegardes />
     {:else if app.page === 'reglages'}
       <Reglages />
     {:else if app.page === 'journal'}
