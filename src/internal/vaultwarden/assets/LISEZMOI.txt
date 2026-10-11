@@ -1,0 +1,6 @@
+Ce dossier reçoit, au moment de la compilation, les deux fichiers embarqués dans l'exe :
+
+  vaultwarden.exe.gz   Vaultwarden compilé depuis le source officiel (x86_64-pc-windows-msvc)
+  web-vault.tar.gz     l'interface web appariée à cette version (dossier racine « web-vault »)
+
+Ils sont produits par build.ps1 et ne sont pas versionnés.

@@ -1,0 +1,92 @@
+package vaultwarden
+
+import (
+	"archive/tar"
+	"bytes"
+	"compress/gzip"
+	"os"
+	"path/filepath"
+	"slices"
+	"strings"
+	"testing"
+)
+
+func makeTgz(t *testing.T, entries map[string]string) []byte {
+	t.Helper()
+	var buf bytes.Buffer
+	zw := gzip.NewWriter(&buf)
+	tw := tar.NewWriter(zw)
+	names := make([]string, 0, len(entries))
+	for n := range entries {
+		names = append(names, n)
+	}
+	slices.Sort(names)
+	for _, name := range names {
+		body := entries[name]
+		if strings.HasSuffix(name, "/") {
+			tw.WriteHeader(&tar.Header{Name: name, Typeflag: tar.TypeDir, Mode: 0o755})
+			continue
+		}
+		tw.WriteHeader(&tar.Header{Name: name, Typeflag: tar.TypeReg, Mode: 0o644, Size: int64(len(body))})
+		tw.Write([]byte(body))
+	}
+	tw.Close()
+	zw.Close()
+	return buf.Bytes()
+}
+
+func TestUntar(t *testing.T) {
+	dst := filepath.Join(t.TempDir(), "web-vault")
+	tgz := makeTgz(t, map[string]string{
+		"web-vault/":                "",
+		"web-vault/index.html":      "<html>",
+		"web-vault/app/main.js":     "js",
+		"web-vault/vw-version.json": `{"version":"v2025.1.0"}`,
+	})
+	if err := untar(tgz, dst, "web-vault"); err != nil {
+		t.Fatal(err)
+	}
+	if b, _ := os.ReadFile(filepath.Join(dst, "app", "main.js")); string(b) != "js" {
+		t.Errorf("app/main.js = %q", b)
+	}
+	if v := webVaultVersion(dst); v != "v2025.1.0" {
+		t.Errorf("version = %q", v)
+	}
+}
+
+func TestUntarRefuseLesEvasions(t *testing.T) {
+	for _, name := range []string{"web-vault/../evasion.txt", "autre/fichier.txt", "/web-vault/abs.txt"} {
+		tgz := makeTgz(t, map[string]string{name: "x"})
+		if err := untar(tgz, filepath.Join(t.TempDir(), "w"), "web-vault"); err == nil {
+			t.Errorf("%s accepté, aurait dû être refusé", name)
+		}
+	}
+}
+
+func TestEnvironment(t *testing.T) {
+	t.Setenv("ADMIN_TOKEN", "hérité")
+	t.Setenv("SIGNUPS_ALLOWED", "true")
+	env := environment("D", "W", Options{Domaine: "vault.exemple.duckdns.org", Port: 8000})
+	get := func(k string) (string, int) {
+		var v string
+		n := 0
+		for _, kv := range env {
+			if key, val, _ := strings.Cut(kv, "="); key == k {
+				v, n = val, n+1
+			}
+		}
+		return v, n
+	}
+	if _, n := get("ADMIN_TOKEN"); n != 0 {
+		t.Error("ADMIN_TOKEN hérité de la session doit être écarté")
+	}
+	if v, n := get("SIGNUPS_ALLOWED"); v != "false" || n != 1 {
+		t.Errorf("SIGNUPS_ALLOWED = %q (%d fois)", v, n)
+	}
+	if v, _ := get("DOMAIN"); v != "https://vault.exemple.duckdns.org" {
+		t.Errorf("DOMAIN = %q", v)
+	}
+	if v, _ := get("ROCKET_ADDRESS"); v != "127.0.0.1" {
+		t.Errorf("ROCKET_ADDRESS = %q, Vaultwarden ne doit écouter qu'en local", v)
+	}
+}

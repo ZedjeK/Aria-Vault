@@ -1,0 +1,6 @@
+# Binaires produits
+*.exe
+/.work/
+
+# Vaultwarden embarqué, produit par build.ps1
+src/internal/vaultwarden/assets/*.gz
