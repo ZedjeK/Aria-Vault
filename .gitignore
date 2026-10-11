@@ -4,3 +4,9 @@
 
 # Vaultwarden embarqué, produit par build.ps1
 src/internal/vaultwarden/assets/*.gz
+src/internal/vaultwarden/assets/version.txt
+
+# Interface et ressources générées
+src/frontend/node_modules/
+src/frontend/dist/
+src/*.syso

@@ -18,6 +18,7 @@ type Config struct {
 	Domaine      string `json:"domaine"`
 	JetonChiffre []byte `json:"jetonDuckDNS,omitempty"` // DPAPI, encodé en base64 dans le JSON
 	Email        string `json:"email,omitempty"`        // facultatif : avertissements Let's Encrypt
+	Inscriptions bool   `json:"inscriptions,omitempty"` // création de comptes autorisée
 }
 
 // Load lit config.json. Un fichier absent donne une configuration vide.

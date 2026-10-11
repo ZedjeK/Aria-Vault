@@ -1,0 +1,407 @@
+/* Thème « Terminal Néon Glace », commun à la famille Aria : bleu nuit,
+   néons cyan/bleu/blanc, orange pour les actions principales. */
+:root {
+  --bg: #030812;
+  --sidebar: #030812;
+  --surface: #06101f;
+  --surface-sunken: #040b17;
+  --hover: #0b1a30;
+  --line: #1a2d4d;
+  --line-soft: #12213a;
+  --line-strong: #27406b;
+  --text: #ddebff;
+  --muted: #93a8c8;
+  --faint: #8197b8;
+  --dim: #3b5378;
+
+  --accent: #7df9ff; /* actif, OK */
+  --accent-2: #5c8bff; /* bleu du logo */
+  --action: #ff8a1f; /* orange de l'œil : actions principales */
+  --on-action: #1a0b00;
+  --ghost: #a9b8ff; /* mode Fantôme */
+  --warn: #ffd166;
+  --danger: #ff5c7a;
+
+  /* Coins coupés, comme l'octogone du logo */
+  --cut: 14px;
+
+  --font-display: 'Space Grotesk', system-ui, sans-serif;
+  --font-body: 'IBM Plex Mono', ui-monospace, monospace;
+  --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
+
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+  overflow: hidden;
+}
+
+/* Fines lignes de balayage, façon écran */
+body {
+  background-image: repeating-linear-gradient(
+    0deg,
+    rgba(125, 249, 255, 0.035) 0px,
+    rgba(125, 249, 255, 0.035) 1px,
+    transparent 1px,
+    transparent 4px
+  );
+}
+
+#app {
+  height: 100%;
+}
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+}
+button:disabled {
+  cursor: not-allowed;
+}
+button:focus-visible,
+a:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--line-strong);
+  border-radius: 10px;
+  border: 3px solid var(--bg);
+}
+
+/* Coins biseautés (WebView2 récent) ; sinon, simples coins arrondis. */
+.bevel,
+.card,
+.btn-primary,
+.btn-ghost,
+.log,
+.banner {
+  corner-shape: bevel;
+}
+
+/* ---------- Briques communes aux pages ---------- */
+
+.page {
+  container-type: inline-size;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  max-width: 1100px;
+}
+
+.page-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.page-head h1 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 28px;
+  font-weight: 700;
+  color: #ffffff;
+}
+.page-head h1::before {
+  content: '>';
+  margin-right: 10px;
+  font-family: var(--font-mono);
+  font-weight: 500;
+  color: var(--action);
+}
+.page-intro {
+  margin: -8px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.6;
+  max-width: 640px;
+}
+
+.grid-2 {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+@container (min-width: 600px) {
+  .grid-2 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--cut) 0;
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.card h2 {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--faint);
+}
+.card-text {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--muted);
+}
+.eyebrow {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  color: var(--faint);
+}
+.hint {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--faint);
+}
+.error {
+  margin: 0;
+  font-size: 13px;
+  color: var(--danger);
+}
+.path {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--faint);
+  word-break: break-all;
+}
+.banner {
+  margin: 0;
+  padding: 12px 14px;
+  border-radius: 10px 0;
+  background: color-mix(in srgb, var(--warn) 10%, transparent);
+  border: 1px solid color-mix(in srgb, var(--warn) 45%, transparent);
+  color: var(--warn);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+/* Boutons */
+.actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.btn-primary,
+.btn-ghost {
+  min-height: 44px;
+  padding: 0 16px;
+  border-radius: 10px 0;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 600;
+}
+.btn-primary {
+  background: var(--action);
+  border: 1px solid var(--action);
+  color: var(--on-action);
+}
+.btn-primary:hover:not(:disabled) {
+  background: #ff9d42;
+}
+.btn-ghost {
+  background: transparent;
+  border: 1px solid var(--line-strong);
+  color: var(--text);
+}
+.btn-ghost:hover:not(:disabled) {
+  background: var(--hover);
+  border-color: var(--accent-2);
+}
+.btn-primary:disabled,
+.btn-ghost:disabled {
+  opacity: 0.45;
+}
+.grow {
+  flex: 1;
+}
+
+/* Pastilles d'état */
+.pill,
+.chip {
+  flex: none;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.5px;
+  padding: 4px 9px;
+  border-radius: 6px 0;
+  corner-shape: bevel;
+  background: var(--line-soft);
+  color: var(--muted);
+}
+.pill.on,
+.chip.ok {
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  color: var(--accent);
+}
+.chip.fail {
+  background: color-mix(in srgb, var(--danger) 14%, transparent);
+  color: var(--danger);
+}
+.chip.warn {
+  background: color-mix(in srgb, var(--warn) 14%, transparent);
+  color: var(--warn);
+}
+
+/* Lignes de liste */
+.row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 44px;
+}
+.row + .row {
+  border-top: 1px solid var(--line-soft);
+  padding-top: 10px;
+}
+.row-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+.row-name {
+  font-size: 13px;
+  font-weight: 500;
+}
+.row-detail {
+  font-size: 12px;
+  color: var(--faint);
+}
+
+/* Journal */
+.log {
+  margin: 0;
+  padding: 12px;
+  list-style: none;
+  background: var(--surface-sunken);
+  border: 1px solid var(--line);
+  border-radius: 10px 0;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.log li {
+  display: flex;
+  gap: 8px;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+.log li span:first-child {
+  color: var(--accent);
+  flex: none;
+}
+.log li.fail span {
+  color: var(--danger);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+/* ---------- Formulaires ---------- */
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+.field-label {
+  font-size: 13px;
+  font-weight: 500;
+}
+.field-error {
+  font-size: 12px;
+  color: var(--danger);
+}
+input {
+  width: 100%;
+  min-height: 40px;
+  padding: 0 12px;
+  border-radius: 8px 0;
+  corner-shape: bevel;
+  border: 1px solid var(--line-strong);
+  background: var(--surface-sunken);
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 13px;
+}
+input::placeholder {
+  color: var(--faint);
+  opacity: 0.6;
+  font-style: italic;
+}
+input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+.with-btn {
+  display: flex;
+  gap: 8px;
+}
+.small {
+  min-height: 40px;
+  padding: 0 12px;
+  font-size: 12px;
+}
+.value {
+  font-size: 13px;
+  color: var(--muted);
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+.mono {
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+.log li.ok span:first-child {
+  color: var(--accent);
+}

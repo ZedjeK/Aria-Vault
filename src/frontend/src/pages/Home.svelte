@@ -1,0 +1,332 @@
+<script>
+  import Logo from '../lib/Logo.svelte'
+  import { app, start, stop, openVault, formatDate, formatSince, daysLeft } from '../lib/state.svelte.js'
+
+  const st = $derived(app.status)
+  const m = $derived(st?.moteur ?? { etat: 'arrete' })
+  const etat = $derived(m.etat)
+  const configure = $derived(st?.configure ?? false)
+
+  const word = $derived(
+    { actif: 'EN LIGNE', demarrage: 'DÉMARRAGE', erreur: 'ERREUR' }[etat] ?? 'HORS LIGNE',
+  )
+  const tone = $derived({ actif: 'ok', demarrage: 'start', erreur: 'warn' }[etat] ?? 'off')
+
+  const certFin = $derived(formatDate(m.certificat))
+  const certJours = $derived(daysLeft(m.certificat))
+
+  const tags = { ok: '[ok]', wait: '[..]', off: '[--]', alert: '[!!]' }
+  const lines = $derived([
+    {
+      id: 'vaultwarden',
+      page: 'journal',
+      tag: etat === 'actif' ? 'ok' : etat === 'demarrage' ? 'wait' : 'off',
+      name: 'vaultwarden',
+      detail: `${st?.vaultwarden ? `v${st.vaultwarden} · ` : ''}127.0.0.1:8000, invisible du réseau`,
+    },
+    {
+      id: 'https',
+      page: 'https',
+      tag: etat === 'actif' ? 'ok' : etat === 'demarrage' ? 'wait' : !configure ? 'alert' : 'off',
+      name: 'https',
+      detail:
+        etat === 'actif' && certFin
+          ? `certificat Let's Encrypt jusqu'au ${certFin}`
+          : etat === 'demarrage'
+            ? m.detail
+            : configure
+              ? 'port 443, certificat Let\'s Encrypt'
+              : 'à configurer',
+    },
+    {
+      id: 'autostart',
+      page: 'reglages',
+      tag: st?.autostart ? 'ok' : 'off',
+      name: 'démarrage',
+      detail: st?.autostart ? 'à l\'ouverture de session, en silence' : 'manuel',
+    },
+    ...(st?.inscriptions
+      ? [{ id: 'inscriptions', page: 'reglages', tag: 'alert', name: 'inscriptions', detail: 'ouvertes : referme-les une fois ton compte créé' }]
+      : []),
+  ])
+</script>
+
+<div class="page">
+  <h1 class="cmd"><span class="cwd">~/aria</span> $ statut</h1>
+
+  <section class="hero" aria-label="État du coffre">
+    <div class="hero-text">
+      <span class="eyebrow">État du coffre</span>
+      <p class="word {tone}">{word}</p>
+      <p class="sub">
+        {#if etat === 'actif'}
+          Ton coffre répond sur https://{m.domaine} · {formatSince(m.depuis)}. Ton téléphone peut se synchroniser.
+        {:else if etat === 'demarrage'}
+          En cours : {m.detail}…
+        {:else if etat === 'erreur'}
+          {m.detail}
+        {:else if !configure}
+          Commence par la page HTTPS : ton sous-domaine DuckDNS et son jeton suffisent.
+        {:else}
+          Le coffre est arrêté : ton téléphone garde sa copie hors ligne, mais ne peut plus se synchroniser.
+        {/if}
+      </p>
+    </div>
+    <div class="hero-logo" class:on={etat === 'actif'}>
+      <Logo size={150} dim={etat !== 'actif'} label="Logo Aria Vaultwarden" />
+    </div>
+  </section>
+
+  <div class="bottom">
+    <section class="card" aria-label="Moteurs">
+      <h2>Moteurs</h2>
+      <div class="lines">
+        {#each lines as l (l.id)}
+          <button class="line" onclick={() => (app.page = l.page)}>
+            <span class="tag {l.tag}">{tags[l.tag]}</span>
+            <span class="name">{l.name}</span>
+            <span class="detail">{l.detail}</span>
+          </button>
+        {/each}
+      </div>
+      <div class="facts">
+        <span>adresse <strong>{st?.domaine ? `https://${st.domaine}` : '—'}</strong>{#if etat === 'actif'}<span class="cursor" aria-hidden="true"></span>{/if}</span>
+        {#if certJours !== null && certJours < 20}
+          <span class="warn-text">certificat : {certJours} j restants, le renouvellement devrait déjà avoir eu lieu</span>
+        {/if}
+      </div>
+    </section>
+
+    <section class="control" aria-label="Contrôle">
+      <span class="eyebrow">Contrôle</span>
+      <div class="cta-zone">
+        {#if !configure}
+          <button class="cta" onclick={() => (app.page = 'https')}>configurer https</button>
+          <p class="hint">Domaine DuckDNS et jeton : c'est tout ce qu'il faut.</p>
+        {:else if etat === 'actif' || etat === 'demarrage'}
+          <button class="btn-ghost" onclick={openVault} disabled={app.busy || etat !== 'actif'}>ouvrir le coffre ↗</button>
+          <button class="cta" onclick={stop} disabled={app.busy}>{app.busy ? 'arrêt…' : 'arrêter le coffre'}</button>
+          <p class="hint">Fermer la fenêtre ne l'arrête pas : Aria reste dans la zone de notification.</p>
+        {:else}
+          <button class="cta" onclick={start} disabled={app.busy}>{app.busy ? 'démarrage…' : etat === 'erreur' ? 'réessayer' : 'démarrer le coffre'}</button>
+          {#if etat === 'erreur'}
+            <button class="btn-ghost" onclick={() => (app.page = 'journal')}>voir le journal</button>
+          {/if}
+        {/if}
+        {#if app.error}
+          <p class="error" role="alert">{app.error}</p>
+        {/if}
+      </div>
+    </section>
+  </div>
+</div>
+
+<style>
+  .cmd {
+    margin: 0;
+    font-family: var(--font-mono);
+    font-size: 13px;
+    font-weight: 400;
+    color: var(--faint);
+  }
+  .cwd {
+    color: var(--action);
+    margin-right: 6px;
+  }
+
+  .hero {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 20px;
+    align-items: center;
+    padding: 22px 26px;
+    background: var(--surface);
+    border: 1px solid var(--line-strong);
+    border-radius: 18px;
+    corner-shape: bevel;
+  }
+  .hero-text {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    min-width: 0;
+  }
+  .word {
+    margin: 0;
+    font-family: var(--font-display);
+    font-size: 52px;
+    font-weight: 700;
+    line-height: 1;
+    color: #ffffff;
+    overflow-wrap: anywhere;
+  }
+  .word.ok {
+    text-shadow: -3px 0 0 var(--accent), 3px 0 0 var(--accent-2);
+  }
+  .word.start {
+    text-shadow: -3px 0 0 var(--accent-2), 3px 0 0 var(--accent);
+    animation: flicker 1.6s steps(1) infinite;
+  }
+  .word.off {
+    text-shadow: -3px 0 0 var(--action), 3px 0 0 var(--accent-2);
+  }
+  .word.warn {
+    color: var(--warn);
+    text-shadow: -3px 0 0 var(--danger), 3px 0 0 var(--accent-2);
+  }
+  @keyframes flicker {
+    50% {
+      opacity: 0.6;
+    }
+  }
+  .sub {
+    margin: 0;
+    font-size: 13px;
+    line-height: 1.6;
+    color: var(--muted);
+    max-width: 520px;
+    overflow-wrap: anywhere;
+  }
+  .hero-logo {
+    border-radius: 50%;
+    padding: 6px;
+  }
+  .hero-logo.on {
+    background: radial-gradient(circle, rgba(125, 249, 255, 0.14) 0%, rgba(125, 249, 255, 0) 70%);
+  }
+
+  .bottom {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 16px;
+  }
+  @container (min-width: 640px) {
+    .bottom {
+      grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
+    }
+  }
+  @container (max-width: 520px) {
+    .hero {
+      grid-template-columns: minmax(0, 1fr);
+    }
+    .hero-logo {
+      display: none;
+    }
+    .word {
+      font-size: 38px;
+    }
+  }
+
+  .lines {
+    display: flex;
+    flex-direction: column;
+  }
+  .line {
+    display: grid;
+    grid-template-columns: 40px 104px minmax(0, 1fr);
+    gap: 8px;
+    align-items: baseline;
+    min-height: 36px;
+    padding: 8px;
+    margin: 0 -8px;
+    border: none;
+    border-radius: 6px 0;
+    corner-shape: bevel;
+    background: transparent;
+    color: var(--text);
+    font-family: var(--font-mono);
+    font-size: 13px;
+    text-align: left;
+  }
+  .line:hover {
+    background: var(--hover);
+  }
+  .tag {
+    white-space: pre;
+    color: var(--faint);
+  }
+  .tag.ok {
+    color: var(--accent);
+  }
+  .tag.wait {
+    color: var(--accent-2);
+  }
+  .tag.alert {
+    color: var(--warn);
+  }
+  .name {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .detail {
+    color: var(--muted);
+    font-size: 12px;
+    overflow-wrap: anywhere;
+  }
+  .facts {
+    margin-top: auto;
+    padding-top: 10px;
+    border-top: 1px solid var(--line-soft);
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: 13px;
+    color: var(--faint);
+  }
+  .facts strong {
+    margin-left: 6px;
+    font-weight: 500;
+    color: var(--text);
+    overflow-wrap: anywhere;
+  }
+  .warn-text {
+    color: var(--warn);
+    font-size: 12px;
+  }
+  .cursor {
+    display: inline-block;
+    width: 8px;
+    height: 15px;
+    margin-left: 6px;
+    vertical-align: -2px;
+    background: var(--action);
+    animation: blink 1.1s steps(1) infinite;
+  }
+  @keyframes blink {
+    50% {
+      opacity: 0;
+    }
+  }
+
+  .control {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    min-width: 0;
+  }
+  .cta-zone {
+    margin-top: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .cta {
+    width: 100%;
+    min-height: 52px;
+    border: none;
+    border-radius: 12px 0;
+    corner-shape: bevel;
+    background: var(--action);
+    color: var(--on-action);
+    font-family: var(--font-mono);
+    font-size: 15px;
+    font-weight: 600;
+  }
+  .cta:hover:not(:disabled) {
+    background: #ff9d42;
+  }
+  .cta:disabled {
+    opacity: 0.45;
+  }
+</style>

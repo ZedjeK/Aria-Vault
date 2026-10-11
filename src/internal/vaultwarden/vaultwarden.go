@@ -36,8 +36,18 @@ var assets embed.FS
 const (
 	exeAsset      = "assets/vaultwarden.exe.gz"
 	webVaultAsset = "assets/web-vault.tar.gz"
-	startTimeout  = 60 * time.Second // la 1re ouverture d'un gros coffre peut migrer la base
+	versionAsset  = "assets/version.txt" // écrit par build.ps1
+	startTimeout  = 60 * time.Second     // la 1re ouverture d'un gros coffre peut migrer la base
 )
+
+// Version renvoie la version de Vaultwarden embarquée, si build.ps1 l'a indiquée.
+func Version() string {
+	b, err := assets.ReadFile(versionAsset)
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(string(b))
+}
 
 // Options règle le lancement de Vaultwarden.
 type Options struct {

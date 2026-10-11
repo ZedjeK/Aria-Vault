@@ -1,10 +1,10 @@
-# Compile aria-moteur.exe sur un runner Windows de GitHub : rien à installer
+# Compile Aria-Vaultwarden.exe sur un runner Windows de GitHub : rien à installer
 # sur ta machine. Vaultwarden est compilé depuis le source officiel non modifié,
 # son interface web est vérifiée par checksum, puis les deux sont embarqués dans l'exe.
 #
-# Actions → Moteur (étape 1) → Run workflow. Version vide = dernière release officielle.
+# Actions → Compiler Aria Vaultwarden → Run workflow. Version vide = dernière release officielle.
 
-name: Moteur (étape 1)
+name: Compiler Aria Vaultwarden
 
 on:
   workflow_dispatch:
@@ -119,35 +119,41 @@ jobs:
           go-version-file: src/go.mod
           cache-dependency-path: src/go.sum
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: src/frontend/package-lock.json
+
       - name: Tests
         working-directory: src
-        run: go test ./...
+        run: go test ./internal/...
 
-      - name: Compiler aria-moteur.exe
-        run: ./build.ps1 -Vaultwarden vw-dist
+      - name: Compiler Aria-Vaultwarden.exe
+        run: ./build.ps1 -Vaultwarden vw-dist -VaultwardenVersion ${{ steps.vw.outputs.version }}
 
       - name: Assembler
         run: |
           New-Item -ItemType Directory -Force dist | Out-Null
-          Copy-Item aria-moteur.exe dist/
-          $sha = (Get-FileHash dist/aria-moteur.exe -Algorithm SHA256).Hash.ToLower()
+          Copy-Item Aria-Vaultwarden.exe dist/
+          $sha = (Get-FileHash dist/Aria-Vaultwarden.exe -Algorithm SHA256).Hash.ToLower()
           @"
-          Aria Vaultwarden - moteur (étape 1)
+          Aria Vaultwarden
           Commit Aria         : $env:GITHUB_SHA
           Vaultwarden         : ${{ steps.vw.outputs.version }} ($(git -C vw-src log -1 --format=%H))
           Interface web       : ${{ steps.vault.outputs.version }}
-          Toolchains          : $(rustc --version) / $(go version)
-          SHA256 aria-moteur.exe :
+          Toolchains          : $(rustc --version) / $(go version) / node $(node --version)
+          SHA256 Aria-Vaultwarden.exe :
           $sha
           "@ | Out-File dist/BUILDINFO.txt -Encoding utf8
           Get-Content dist/BUILDINFO.txt
 
       - uses: actions/attest-build-provenance@v2
         with:
-          subject-path: dist/aria-moteur.exe
+          subject-path: dist/Aria-Vaultwarden.exe
 
       - uses: actions/upload-artifact@v4
         with:
-          name: aria-moteur-vw${{ steps.vw.outputs.version }}
+          name: Aria-Vaultwarden-vw${{ steps.vw.outputs.version }}
           path: dist/
           if-no-files-found: error

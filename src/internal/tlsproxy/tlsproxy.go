@@ -9,6 +9,7 @@ package tlsproxy
 import (
 	"context"
 	"crypto/tls"
+	"crypto/x509"
 	"errors"
 	"net"
 	"net/http"
@@ -37,9 +38,11 @@ type Options struct {
 
 // Proxy est le relais HTTPS en cours d'exécution.
 type Proxy struct {
-	srv   *http.Server
-	cache *certmagic.Cache
-	done  chan error
+	srv     *http.Server
+	cache   *certmagic.Cache
+	tlsCfg  *tls.Config
+	domaine string
+	done    chan error
 }
 
 // Start ouvre le port, obtient (ou recharge) le certificat, puis sert le coffre.
@@ -108,8 +111,10 @@ func Start(ctx context.Context, o Options) (*Proxy, error) {
 			// Pas de WriteTimeout : WebSockets et pièces jointes peuvent durer.
 			ErrorLog: zap.NewStdLog(logger.Named("http")),
 		},
-		cache: cache,
-		done:  make(chan error, 1),
+		cache:   cache,
+		tlsCfg:  tlsCfg,
+		domaine: o.Domaine,
+		done:    make(chan error, 1),
 	}
 	go func() {
 		err := p.srv.Serve(tls.NewListener(ln, tlsCfg))
@@ -119,6 +124,25 @@ func Start(ctx context.Context, o Options) (*Proxy, error) {
 		p.done <- err
 	}()
 	return p, nil
+}
+
+// Expiry renvoie la date de fin du certificat servi (renouvelé automatiquement
+// par certmagic environ 30 jours avant), ou zéro s'il est introuvable.
+func (p *Proxy) Expiry() time.Time {
+	cert, err := p.tlsCfg.GetCertificate(&tls.ClientHelloInfo{ServerName: p.domaine})
+	if err != nil || cert == nil {
+		return time.Time{}
+	}
+	leaf := cert.Leaf
+	if leaf == nil && len(cert.Certificate) > 0 {
+		if leaf, err = x509.ParseCertificate(cert.Certificate[0]); err != nil {
+			return time.Time{}
+		}
+	}
+	if leaf == nil {
+		return time.Time{}
+	}
+	return leaf.NotAfter
 }
 
 // Done reçoit l'erreur du serveur s'il s'arrête de lui-même.

@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-8 -8 176 176" width="512" height="512">
+  <!-- Logo d'Aria Vaultwarden : le A glitché de la famille Aria, avec un trou de serrure orange. -->
+  <defs>
+    <polygon id="a" points="30,130 70,30 90,30 130,130 110,130 80,54 50,130"/>
+    <clipPath id="bl"><rect x="0" y="72" width="80" height="90"/></clipPath>
+    <clipPath id="br"><rect x="80" y="72" width="80" height="90"/></clipPath>
+    <clipPath id="t"><rect x="0" y="0" width="160" height="72"/></clipPath>
+    <g id="cle">
+      <circle cx="80" cy="98" r="7.5"/>
+      <polygon points="76.5,102 83.5,102 87,118 73,118"/>
+    </g>
+  </defs>
+  <polygon points="24,0 136,0 160,24 160,136 136,160 24,160 0,136 0,24" fill="#030812"/>
+  <polygon points="26,7 134,7 153,26 153,134 134,153 26,153 7,134 7,26" fill="none" stroke="#4D7CFF" stroke-width="2" opacity="0.65"/>
+  <g stroke-linejoin="round" fill="none" stroke-width="5">
+    <g clip-path="url(#bl)" stroke="#7DF9FF"><use href="#a"/></g>
+    <g clip-path="url(#br)" stroke="#5C8BFF"><use href="#a"/></g>
+    <g transform="translate(7,0)"><g clip-path="url(#t)" stroke="#FFFFFF"><use href="#a"/></g></g>
+  </g>
+  <use href="#cle" fill="#7DF9FF" opacity="0.55" transform="translate(-3,0)"/>
+  <use href="#cle" fill="#5C8BFF" opacity="0.55" transform="translate(3,0)"/>
+  <use href="#cle" fill="#FF8A1F"/>
+</svg>

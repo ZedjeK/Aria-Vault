@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 160" width="32" height="32">
+  <!-- Variante lisible en 16 à 32 px (barre des tâches) : traits épais, sans cadre intérieur. -->
+  <defs>
+    <polygon id="a" points="28,138 68,24 92,24 132,138 108,138 80,58 52,138"/>
+    <clipPath id="bl"><rect x="0" y="76" width="80" height="90"/></clipPath>
+    <clipPath id="br"><rect x="80" y="76" width="80" height="90"/></clipPath>
+    <clipPath id="t"><rect x="0" y="0" width="160" height="76"/></clipPath>
+  </defs>
+  <polygon points="28,0 132,0 160,28 160,132 132,160 28,160 0,132 0,28" fill="#030812"/>
+  <g stroke-linejoin="round" fill="none" stroke-width="10">
+    <g clip-path="url(#bl)" stroke="#7DF9FF"><use href="#a"/></g>
+    <g clip-path="url(#br)" stroke="#5C8BFF"><use href="#a"/></g>
+    <g transform="translate(8,0)"><g clip-path="url(#t)" stroke="#FFFFFF"><use href="#a"/></g></g>
+  </g>
+  <circle cx="80" cy="103" r="9" fill="#FF8A1F"/>
+  <polygon points="75.5,107 84.5,107 89,136 71,136" fill="#FF8A1F"/>
+</svg>
