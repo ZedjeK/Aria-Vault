@@ -1,12 +1,12 @@
 ﻿# Aria Vaultwarden, étape 1 : compile le moteur en console (aria-moteur.exe).
-# Vaultwarden et son interface web sont pris dans un dossier déjà compilé,
-# par exemple ton installation actuelle ou l'artefact de vaultwarden_windows_build.
+# Normalement lancé par la CI (.github/workflows/moteur.yml), qui compile
+# Vaultwarden depuis le source officiel dani-garcia/vaultwarden et récupère
+# l'interface web officielle vérifiée par checksum, puis appelle ce script.
 #
-# Usage (PowerShell normal, pas besoin d'admin) :
-#   powershell -ExecutionPolicy Bypass -File .\build.ps1
-#   powershell -ExecutionPolicy Bypass -File .\build.ps1 -Vaultwarden D:\vaultwarden-1.37.3
+# Usage : powershell -ExecutionPolicy Bypass -File .\build.ps1 -Vaultwarden <dossier>
+#   <dossier> contient vaultwarden.exe et web-vault\
 
-param([string] $Vaultwarden = 'C:\Vaultwarden')
+param([Parameter(Mandatory = $true)] [string] $Vaultwarden)
 
 $ErrorActionPreference = 'Stop'
 
