@@ -164,7 +164,7 @@ func (s *VaultService) ChooseBackupFolder() (bool, error) {
 		CanChooseFiles(false).
 		CanChooseDirectories(true).
 		CanCreateDirectories(true).
-		SetDirectory(actuel).
+		SetDirectory(paths.Existant(actuel)).
 		PromptForSingleSelection()
 	if err != nil || dir == "" {
 		return false, err
@@ -249,10 +249,9 @@ func (s *VaultService) ExportSettings(phrase string) (bool, error) {
 		return false, err
 	}
 	dir, _ := dossierSauvegarde(cfg)
-	_ = os.MkdirAll(dir, 0o700)
 	dst, err := s.app.Dialog.SaveFile().
 		SetMessage("Enregistrer les réglages d'Aria Vault").
-		SetDirectory(dir).
+		SetDirectory(paths.Existant(dir)).
 		SetFilename("reglages-aria-vault.json").
 		AddFilter("Réglages Aria Vault", "*.json").
 		PromptForSingleSelection()

@@ -44,3 +44,18 @@ func In(base string) Paths {
 		Config:      filepath.Join(base, "config.json"),
 	}
 }
+
+// Existant renvoie p, ou son plus proche parent qui existe ("" si aucun).
+// Utile pour ouvrir une boîte de dialogue Windows, qui refuse un dossier absent.
+func Existant(p string) string {
+	for {
+		if st, err := os.Stat(p); err == nil && st.IsDir() {
+			return p
+		}
+		parent := filepath.Dir(p)
+		if parent == p {
+			return ""
+		}
+		p = parent
+	}
+}
