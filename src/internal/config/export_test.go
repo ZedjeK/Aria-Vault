@@ -1,8 +1,7 @@
 package config
 
 import (
-	"encoding/json"
-	"strings"
+	"bytes"
 	"testing"
 )
 
@@ -20,8 +19,11 @@ func TestExportImport(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if strings.Contains(string(data), jeton) {
-		t.Fatal("le jeton apparaît en clair dans l'export")
+	// Rien de lisible dans le fichier : ni jeton, ni domaine, ni e-mail.
+	for _, secret := range []string{jeton, "vault.exemple", "duckdns", "moi@exemple.fr"} {
+		if bytes.Contains(data, []byte(secret)) {
+			t.Errorf("%q apparaît en clair dans l'export", secret)
+		}
 	}
 
 	got, err := LireExport(data, "ma phrase de passe")
@@ -35,23 +37,33 @@ func TestExportImport(t *testing.T) {
 	if _, err := LireExport(data, "mauvaise phrase"); err != ErrPhrase {
 		t.Errorf("mauvaise phrase : %v", err)
 	}
-
-	// Sans phrase : domaine et e-mail seulement.
-	sans, err := LireExport(data, "")
-	if err != nil || sans.Jeton != "" || sans.Domaine != c.Domaine {
-		t.Errorf("import sans phrase = %+v, %v", sans, err)
+	if _, err := LireExport(data, ""); err == nil {
+		t.Error("import sans phrase accepté")
 	}
 
-	// Domaine modifié dans le fichier : le jeton ne doit plus se déchiffrer.
-	var f map[string]any
-	json.Unmarshal(data, &f)
-	f["domaine"] = "pirate.duckdns.org"
-	altere, _ := json.Marshal(f)
-	if _, err := LireExport(altere, "ma phrase de passe"); err != ErrPhrase {
-		t.Errorf("domaine altéré : %v", err)
+	// Un seul octet modifié, dans l'en-tête ou le chiffré : refusé.
+	for _, i := range []int{12, len(data) - 1} {
+		altere := bytes.Clone(data)
+		altere[i] ^= 1
+		if _, err := LireExport(altere, "ma phrase de passe"); err != ErrPhrase {
+			t.Errorf("octet %d modifié : %v", i, err)
+		}
 	}
 
-	if _, err := LireExport([]byte(`{"format":"autre"}`), "x"); err == nil {
-		t.Error("fichier étranger accepté")
+	// Paramètres scrypt démesurés : refusés avant tout calcul.
+	piege := bytes.Clone(data)
+	piege[8] = 30
+	if _, err := LireExport(piege, "ma phrase de passe"); err == nil || err == ErrPhrase {
+		t.Errorf("paramètres piégés : %v", err)
+	}
+
+	if _, err := LireExport([]byte(`{"format":"aria-vault-reglages"}`), "x"); err == nil {
+		t.Error("ancien format ou fichier étranger accepté")
+	}
+
+	// Deux exports de la même config ne se ressemblent pas (sel et nonce aléatoires).
+	data2, _ := c.Exporter("ma phrase de passe")
+	if bytes.Equal(data, data2) {
+		t.Error("deux exports identiques")
 	}
 }

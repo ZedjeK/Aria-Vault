@@ -266,8 +266,8 @@ func (s *VaultService) ExportSettings(phrase string) (bool, error) {
 	dst, err := s.app.Dialog.SaveFile().
 		SetMessage("Enregistrer les réglages d'Aria Vault").
 		SetDirectory(paths.Existant(dir)).
-		SetFilename("reglages-aria-vault.json").
-		AddFilter("Réglages Aria Vault", "*.json").
+		SetFilename("reglages"+config.ExtensionExport).
+		AddFilter("Réglages Aria Vault", "*"+config.ExtensionExport).
 		PromptForSingleSelection()
 	if err != nil || dst == "" {
 		return false, err
@@ -275,7 +275,7 @@ func (s *VaultService) ExportSettings(phrase string) (bool, error) {
 	if err := os.WriteFile(dst, data, 0o600); err != nil {
 		return false, err
 	}
-	s.j.Add(journal.OK, "Réglages exportés : %s (jeton chiffré par ta phrase de passe)", dst)
+	s.j.Add(journal.OK, "Réglages exportés : %s (fichier entièrement chiffré par ta phrase de passe)", dst)
 	return true, nil
 }
 
@@ -283,16 +283,18 @@ func (s *VaultService) ExportSettings(phrase string) (bool, error) {
 type ImportResult struct {
 	Annule  bool   `json:"annule"`
 	Domaine string `json:"domaine"`
-	Jeton   bool   `json:"jeton"` // le jeton a été importé
 	Error   string `json:"error"`
 }
 
-// ImportSettings lit un fichier de réglages. Phrase vide : domaine et e-mail
-// seulement. Le serveur est relancé s'il tournait.
+// ImportSettings déchiffre un fichier de réglages avec sa phrase de passe
+// (obligatoire) et l'applique. Le serveur est relancé s'il tournait.
 func (s *VaultService) ImportSettings(phrase string) ImportResult {
+	if phrase == "" {
+		return ImportResult{Error: "la phrase de passe du fichier est obligatoire"}
+	}
 	src, err := s.app.Dialog.OpenFile().
 		SetTitle("Fichier de réglages Aria Vault").
-		AddFilter("Réglages Aria Vault", "*.json").
+		AddFilter("Réglages Aria Vault", "*"+config.ExtensionExport).
 		PromptForSingleSelection()
 	if err != nil {
 		return ImportResult{Error: err.Error()}
@@ -308,28 +310,22 @@ func (s *VaultService) ImportSettings(phrase string) ImportResult {
 	if err != nil {
 		return ImportResult{Error: err.Error()}
 	}
-	var errJeton error
-	err = s.majConfig(func(c *config.Config) {
-		c.Domaine, c.Email = imp.Domaine, imp.Email
-		if imp.Jeton != "" {
-			errJeton = c.SetJeton(imp.Jeton) // rechiffré avec DPAPI pour ce compte Windows
-		}
-	})
-	if err == nil {
-		err = errJeton
+	// Le jeton est validé avant toute écriture : rien n'est modifié en cas d'erreur.
+	var nouvelle config.Config
+	if err := nouvelle.SetJeton(imp.Jeton); err != nil { // rechiffré avec DPAPI pour ce compte
+		return ImportResult{Error: err.Error()}
 	}
+	err = s.majConfig(func(c *config.Config) {
+		c.Domaine, c.Email, c.JetonChiffre = imp.Domaine, imp.Email, nouvelle.JetonChiffre
+	})
 	if err != nil {
 		return ImportResult{Error: err.Error()}
 	}
-	if imp.Jeton != "" {
-		s.j.Add(journal.OK, "Réglages importés pour %s, jeton compris", imp.Domaine)
-	} else {
-		s.j.Add(journal.OK, "Réglages importés pour %s (jeton à ressaisir sur la page HTTPS)", imp.Domaine)
-	}
+	s.j.Add(journal.OK, "Réglages importés pour %s, jeton compris", imp.Domaine)
 	if err := s.relancerSiActif(); err != nil {
-		return ImportResult{Domaine: imp.Domaine, Jeton: imp.Jeton != "", Error: err.Error()}
+		return ImportResult{Domaine: imp.Domaine, Error: err.Error()}
 	}
-	return ImportResult{Domaine: imp.Domaine, Jeton: imp.Jeton != ""}
+	return ImportResult{Domaine: imp.Domaine}
 }
 
 // ---------- Accès à config.json ----------

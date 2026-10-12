@@ -1,6 +1,7 @@
 package config
 
 import (
+	"bytes"
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
@@ -12,40 +13,41 @@ import (
 	"golang.org/x/crypto/scrypt"
 )
 
-// Fichier de réglages exportable : domaine et e-mail en clair, jeton DuckDNS
-// chiffré par une phrase de passe (scrypt + AES-256-GCM). À l'import, le jeton
-// est rechiffré avec DPAPI pour le compte Windows qui l'importe.
+// Fichier de réglages exportable (.ariavault), entièrement chiffré par une
+// phrase de passe : rien n'y est lisible sans elle, ni le domaine, ni
+// l'e-mail, ni le jeton DuckDNS. À l'import, le jeton est rechiffré avec
+// DPAPI pour le compte Windows qui l'importe.
+//
+// Format binaire :
+//
+//	"ARIAVLT2" | log2(N) | r | p | sel (16 o) | nonce (12 o) | chiffré AES-256-GCM
+//
+// L'en-tête (tout ce qui précède le chiffré) est authentifié avec le contenu :
+// le moindre octet modifié fait échouer le déchiffrement.
 
 const (
-	formatExport  = "aria-vault-reglages"
-	versionExport = 1
+	ExtensionExport = ".ariavault"
+	PhraseMin       = 8
+
 	// Paramètres scrypt recommandés pour un usage interactif (~0,3 s, 128 Mo).
-	scryptN, scryptR, scryptP = 1 << 17, 8, 1
-	PhraseMin                 = 8
+	scryptLogN, scryptR, scryptP = 17, 8, 1
 )
 
+var magie = []byte("ARIAVLT2")
+
+const tailleEntete = 8 + 3 + 16 + 12
+
 // ErrPhrase signale une phrase de passe incorrecte (ou un fichier altéré).
-var ErrPhrase = errors.New("phrase de passe incorrecte")
+var ErrPhrase = errors.New("phrase de passe incorrecte (ou fichier modifié)")
 
-type exportFile struct {
-	Format  string        `json:"format"`
-	Version int           `json:"version"`
-	Domaine string        `json:"domaine"`
-	Email   string        `json:"email,omitempty"`
-	Jeton   *jetonChiffre `json:"jetonDuckDNS"`
+// Importe est le contenu d'un fichier de réglages déchiffré.
+type Importe struct {
+	Domaine string `json:"domaine"`
+	Email   string `json:"email,omitempty"`
+	Jeton   string `json:"jeton"`
 }
 
-type jetonChiffre struct {
-	KDF     string `json:"kdf"`
-	N       int    `json:"n"`
-	R       int    `json:"r"`
-	P       int    `json:"p"`
-	Sel     []byte `json:"sel"`
-	Nonce   []byte `json:"nonce"`
-	Chiffre []byte `json:"chiffre"`
-}
-
-// Exporter produit le fichier de réglages. La phrase de passe protège le jeton.
+// Exporter produit le fichier de réglages chiffré par la phrase de passe.
 func (c *Config) Exporter(phrase string) ([]byte, error) {
 	if len([]rune(phrase)) < PhraseMin {
 		return nil, fmt.Errorf("la phrase de passe doit faire au moins %d caractères", PhraseMin)
@@ -57,69 +59,65 @@ func (c *Config) Exporter(phrase string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	sel := make([]byte, 16)
-	nonce := make([]byte, 12)
-	if _, err := rand.Read(sel); err != nil {
-		return nil, err
-	}
-	if _, err := rand.Read(nonce); err != nil {
-		return nil, err
-	}
-	gcm, err := aead(phrase, sel, scryptN, scryptR, scryptP)
+	clair, err := json.Marshal(Importe{Domaine: c.Domaine, Email: c.Email, Jeton: jeton})
 	if err != nil {
 		return nil, err
 	}
-	// Le domaine est lié au chiffré : on ne peut pas le changer sans casser le déchiffrement.
-	chiffre := gcm.Seal(nil, nonce, []byte(jeton), []byte(c.Domaine))
-	return json.MarshalIndent(exportFile{
-		Format:  formatExport,
-		Version: versionExport,
-		Domaine: c.Domaine,
-		Email:   c.Email,
-		Jeton:   &jetonChiffre{KDF: "scrypt", N: scryptN, R: scryptR, P: scryptP, Sel: sel, Nonce: nonce, Chiffre: chiffre},
-	}, "", "  ")
+
+	entete := make([]byte, 0, tailleEntete)
+	entete = append(entete, magie...)
+	entete = append(entete, scryptLogN, scryptR, scryptP)
+	alea := make([]byte, 16+12)
+	if _, err := rand.Read(alea); err != nil {
+		return nil, err
+	}
+	entete = append(entete, alea...)
+	sel, nonce := entete[11:27], entete[27:39]
+
+	gcm, err := aead(phrase, sel, 1<<scryptLogN, scryptR, scryptP)
+	if err != nil {
+		return nil, err
+	}
+	return gcm.Seal(entete, nonce, clair, entete), nil
 }
 
-// Importe est le contenu d'un fichier de réglages déchiffré.
-type Importe struct {
-	Domaine string
-	Email   string
-	Jeton   string // vide si aucune phrase n'a été donnée
-}
-
-// LireExport lit un fichier de réglages. Avec une phrase vide, seuls le
-// domaine et l'e-mail sont rendus (le jeton sera à ressaisir).
+// LireExport déchiffre un fichier de réglages. La phrase est obligatoire.
 func LireExport(data []byte, phrase string) (Importe, error) {
-	var f exportFile
-	if err := json.Unmarshal(data, &f); err != nil || f.Format != formatExport {
-		return Importe{}, errors.New("ce n'est pas un fichier de réglages Aria Vault")
+	if phrase == "" {
+		return Importe{}, errors.New("la phrase de passe du fichier est obligatoire")
 	}
-	if f.Version != versionExport {
-		return Importe{}, fmt.Errorf("version de fichier %d non prise en charge", f.Version)
+	if len(data) <= tailleEntete || !bytes.Equal(data[:8], magie) {
+		return Importe{}, errors.New("ce n'est pas un fichier de réglages Aria Vault (.ariavault)")
 	}
-	d, err := NormaliserDomaine(f.Domaine)
-	if err != nil {
-		return Importe{}, err
-	}
-	out := Importe{Domaine: d, Email: strings.TrimSpace(f.Email)}
-	if phrase == "" || f.Jeton == nil {
-		return out, nil
-	}
-	j := f.Jeton
+	logN, r, p := int(data[8]), int(data[9]), int(data[10])
 	// Bornes raisonnables : un fichier piégé ne doit pas faire exploser la mémoire.
-	if j.KDF != "scrypt" || j.N < 1<<14 || j.N > 1<<20 || j.R < 1 || j.R > 16 || j.P < 1 || j.P > 4 || len(j.Sel) < 16 || len(j.Nonce) != 12 {
+	if logN < 14 || logN > 20 || r < 1 || r > 16 || p < 1 || p > 4 {
 		return Importe{}, errors.New("paramètres de chiffrement invalides dans le fichier")
 	}
-	gcm, err := aead(phrase, j.Sel, j.N, j.R, j.P)
+	entete, chiffre := data[:tailleEntete], data[tailleEntete:]
+	sel, nonce := entete[11:27], entete[27:39]
+
+	gcm, err := aead(phrase, sel, 1<<logN, r, p)
 	if err != nil {
 		return Importe{}, err
 	}
-	clair, err := gcm.Open(nil, j.Nonce, j.Chiffre, []byte(f.Domaine))
+	clair, err := gcm.Open(nil, nonce, chiffre, entete)
 	if err != nil {
 		return Importe{}, ErrPhrase
 	}
-	out.Jeton = string(clair)
-	return out, nil
+
+	var imp Importe
+	if err := json.Unmarshal(clair, &imp); err != nil {
+		return Importe{}, errors.New("contenu du fichier illisible")
+	}
+	if imp.Domaine, err = NormaliserDomaine(imp.Domaine); err != nil {
+		return Importe{}, err
+	}
+	imp.Email = strings.TrimSpace(imp.Email)
+	if !jetonRe.MatchString(imp.Jeton) {
+		return Importe{}, errors.New("jeton DuckDNS invalide dans le fichier")
+	}
+	return imp, nil
 }
 
 func aead(phrase string, sel []byte, n, r, p int) (cipher.AEAD, error) {

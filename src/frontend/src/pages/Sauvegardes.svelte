@@ -54,7 +54,7 @@
     message = ''
     const ok = await exportSettings(phraseExport)
     if (ok && !app.error) {
-      message = 'Réglages exportés. Garde ta phrase de passe en lieu sûr : sans elle, le jeton sera à ressaisir.'
+      message = 'Réglages exportés dans un fichier entièrement chiffré. Garde ta phrase de passe en lieu sûr : sans elle, le fichier est illisible.'
       phraseExport = phraseExport2 = ''
     }
   }
@@ -63,9 +63,7 @@
     message = ''
     const res = await importSettings(phraseImport)
     if (res && !res.annule && !res.error) {
-      message = res.jeton
-        ? `Réglages importés pour ${res.domaine}, jeton compris.`
-        : `Réglages importés pour ${res.domaine}. Recolle ton jeton DuckDNS sur la page HTTPS.`
+      message = `Réglages importés pour ${res.domaine}, jeton compris.`
       phraseImport = ''
     }
   }
@@ -175,8 +173,8 @@
       </button>
     </div>
     <p class="card-text">
-      Domaine, e-mail et jeton DuckDNS, dans un fichier à part du coffre. Le jeton y est chiffré par ta phrase de passe :
-      sur un autre PC, tu retrouves tout sans rien ressaisir.
+      Domaine, e-mail et jeton DuckDNS, dans un fichier .ariavault à part du coffre, entièrement chiffré par ta phrase
+      de passe : sans elle, rien n'y est lisible. Sur un autre PC, tu retrouves tout sans rien ressaisir.
     </p>
     <div class="grid-2">
       <form class="form" onsubmit={(e) => { e.preventDefault(); exporter() }}>
@@ -189,8 +187,8 @@
       <form class="form" onsubmit={(e) => { e.preventDefault(); importerReglages() }}>
         <span class="eyebrow">Importer</span>
         <input type={montrerPhrases ? 'text' : 'password'} bind:value={phraseImport} placeholder="Phrase de passe du fichier" autocomplete="off" />
-        <p class="hint">Sans phrase : domaine et e-mail seulement, le jeton sera à recoller.</p>
-        <button type="submit" class="btn-ghost" disabled={app.busy}>Importer des réglages…</button>
+        <p class="hint">La phrase choisie à l'export. Si elle est fausse, rien n'est modifié.</p>
+        <button type="submit" class="btn-ghost" disabled={app.busy || !phraseImport}>Importer des réglages…</button>
       </form>
     </div>
   </section>
