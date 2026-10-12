@@ -8,6 +8,7 @@
 
   const b = $derived(app.backups)
   const liste = $derived(b?.liste ?? [])
+  const choisi = $derived(!!b?.dossier)
   const enLigne = $derived(['actif', 'demarrage'].includes(app.status?.moteur?.etat))
 
   let aConfirmer = $state('') // sauvegarde en attente de confirmation de restauration
@@ -23,6 +24,11 @@
 
   async function sauvegarder() {
     message = ''
+    // Premier clic sans dossier : on le choisit d'abord, puis on sauvegarde.
+    if (!choisi) {
+      const ok = await chooseBackupFolder()
+      if (!ok || app.error) return
+    }
     const info = await backupNow()
     if (info?.nom) message = `Sauvegarde créée : ${info.nom} (${formatTaille(info.taille)})`
   }
@@ -69,7 +75,7 @@
   <div class="page-head">
     <h1>Sauvegardes</h1>
     <span class="pill" class:on={liste.length > 0}>
-      {liste.length ? `Dernière : ${formatSince(liste[0].date).replace('depuis', 'il y a')}` : 'Aucune sauvegarde'}
+      {liste.length ? `Dernière : ${formatSince(liste[0].date).replace('depuis', 'il y a')}` : choisi ? 'Aucune sauvegarde' : 'Dossier à choisir'}
     </span>
   </div>
   <p class="page-intro">
@@ -84,7 +90,7 @@
     <section class="card">
       <h2>Coffre</h2>
       <button class="btn-primary big" onclick={sauvegarder} disabled={app.busy || !app.status?.configure}>
-        {app.busy ? 'En cours…' : 'Sauvegarder maintenant'}
+        {app.busy ? 'En cours…' : choisi ? 'Sauvegarder maintenant' : 'Choisir et sauvegarder'}
       </button>
       <p class="hint">
         {enLigne ? 'Le serveur se met en pause quelques secondes, ton téléphone réessaie tout seul.' : 'Aussi possible d\'un clic droit sur l\'icône Aria.'}
@@ -101,17 +107,30 @@
       <div class="row">
         <div class="row-text">
           <span class="row-name">Dossier</span>
-          <span class="path">{b?.dossier ?? ''}</span>
+          {#if choisi}
+            <span class="path">{b.dossier}</span>
+          {:else}
+            <span class="row-detail warn-text">à choisir</span>
+          {/if}
         </div>
         <span class="btns">
-          <button class="btn-ghost small" onclick={chooseBackupFolder} disabled={app.busy}>Changer</button>
-          <button class="btn-ghost small" onclick={openBackupFolder} disabled={app.busy}>Ouvrir</button>
+          <button class="small {choisi ? 'btn-ghost' : 'btn-primary'}" onclick={chooseBackupFolder} disabled={app.busy}>
+            {choisi ? 'Changer' : 'Choisir…'}
+          </button>
+          {#if choisi}
+            <button class="btn-ghost small" onclick={openBackupFolder} disabled={app.busy}>Ouvrir</button>
+          {/if}
         </span>
       </div>
-      {#if b?.parDefaut}
+      {#if !choisi}
         <p class="hint warn-text">
-          Ce dossier est sur le même disque que le coffre : si le disque lâche, tu perds les deux. Choisis plutôt un dossier
-          OneDrive ou un disque externe.
+          Aucune sauvegarde tant que le dossier n'est pas choisi, la quotidienne comprise. Choisis de préférence un dossier
+          OneDrive ou un disque externe ; tu peux en créer un nouveau directement dans la fenêtre.
+        </p>
+      {:else if b.memeDisque}
+        <p class="hint warn-text">
+          Ce dossier est sur le même disque que le coffre : si le disque lâche, tu perds les deux. Un dossier OneDrive ou un
+          disque externe serait plus sûr.
         </p>
       {/if}
     </section>

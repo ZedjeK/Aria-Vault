@@ -21,3 +21,16 @@ func TestExistant(t *testing.T) {
 		t.Error("aucun dossier ne doit être créé")
 	}
 }
+
+func TestSurOneDrive(t *testing.T) {
+	racine := t.TempDir()
+	t.Setenv("OneDrive", filepath.Join(racine, "OneDrive"))
+	t.Setenv("OneDriveConsumer", "")
+	t.Setenv("OneDriveCommercial", "")
+	if !SurOneDrive(filepath.Join(racine, "OneDrive", "Aria Vault")) {
+		t.Error("sous-dossier OneDrive non reconnu")
+	}
+	if SurOneDrive(filepath.Join(racine, "OneDriveFaux", "x")) || SurOneDrive(filepath.Join(racine, "Documents")) {
+		t.Error("faux positif OneDrive")
+	}
+}

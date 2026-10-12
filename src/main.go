@@ -10,6 +10,7 @@ package main
 import (
 	"context"
 	"embed"
+	"errors"
 	"log"
 	"os"
 	"path/filepath"
@@ -161,7 +162,16 @@ func main() {
 		}()
 	})
 	menu.Add("Sauvegarder maintenant").OnClick(func(*application.Context) {
-		go func() { _, _ = svc.Backup() }() // le résultat arrive dans le journal
+		go func() {
+			// Le résultat arrive dans le journal. Sans dossier choisi, on ouvre
+			// la page Sauvegardes pour que l'utilisateur le choisisse.
+			if _, err := svc.Backup(); errors.Is(err, ErrDossierNonChoisi) {
+				application.InvokeAsync(func() {
+					montrer()
+					app.Event.Emit("page", "sauvegardes")
+				})
+			}
+		}()
 	})
 	menu.AddSeparator()
 	menu.Add("Quitter (arrête le serveur)").OnClick(func(*application.Context) { app.Quit() })

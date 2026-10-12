@@ -15,15 +15,18 @@ import (
 	"aria-vaultwarden/internal/sauvegarde"
 )
 
+// ErrDossierNonChoisi : aucune sauvegarde tant qu'aucun dossier n'est choisi.
+var ErrDossierNonChoisi = errors.New("choisis d'abord le dossier des sauvegardes")
+
 // BackupView est l'état de la page Sauvegardes.
 type BackupView struct {
-	Dossier   string            `json:"dossier"`
-	ParDefaut bool              `json:"parDefaut"`
-	Auto      bool              `json:"auto"`
-	Derniere  time.Time         `json:"derniere"`
-	Liste     []sauvegarde.Info `json:"liste"`
-	Garder    int               `json:"garder"`
-	Erreur    string            `json:"erreur"`
+	Dossier    string            `json:"dossier"`    // vide tant qu'il n'est pas choisi
+	MemeDisque bool              `json:"memeDisque"` // même lecteur que le coffre, hors OneDrive
+	Auto       bool              `json:"auto"`
+	Derniere   time.Time         `json:"derniere"`
+	Liste      []sauvegarde.Info `json:"liste"`
+	Garder     int               `json:"garder"`
+	Erreur     string            `json:"erreur"`
 }
 
 // Backups renvoie la configuration et la liste des sauvegardes.
@@ -34,19 +37,16 @@ func (s *VaultService) Backups() BackupView {
 		v.Erreur = err.Error()
 		return v
 	}
-	v.Dossier, v.ParDefaut = dossierSauvegarde(cfg)
+	v.Dossier = cfg.DossierSauvegarde
 	v.Auto, v.Derniere = !cfg.SansSauvegardeAuto, cfg.DerniereSauvegarde
+	if v.Dossier == "" {
+		return v
+	}
+	v.MemeDisque = paths.MemeDisque(v.Dossier, s.p.Donnees) && !paths.SurOneDrive(v.Dossier)
 	if v.Liste, err = sauvegarde.Lister(v.Dossier); err != nil {
 		v.Erreur = err.Error()
 	}
 	return v
-}
-
-func dossierSauvegarde(cfg *config.Config) (string, bool) {
-	if cfg.DossierSauvegarde != "" {
-		return cfg.DossierSauvegarde, false
-	}
-	return paths.SauvegardesParDefaut(), true
 }
 
 // Backup sauvegarde le coffre maintenant. Si le serveur tourne, il est
@@ -59,7 +59,10 @@ func (s *VaultService) Backup() (sauvegarde.Info, error) {
 	if err != nil {
 		return sauvegarde.Info{}, err
 	}
-	dest, _ := dossierSauvegarde(cfg)
+	dest := cfg.DossierSauvegarde
+	if dest == "" {
+		return sauvegarde.Info{}, ErrDossierNonChoisi
+	}
 
 	enLigne := s.pauseServeur("sauvegarde")
 	info, err := sauvegarde.Creer(s.p.Donnees, dest, time.Now())
@@ -90,7 +93,10 @@ func (s *VaultService) Restore(nom string) error {
 	if err != nil {
 		return err
 	}
-	dest, _ := dossierSauvegarde(cfg)
+	dest := cfg.DossierSauvegarde
+	if dest == "" {
+		return ErrDossierNonChoisi
+	}
 	return s.remplacerCoffre("Restauration de "+nom, func(now time.Time) (string, error) {
 		return sauvegarde.Restaurer(filepath.Join(dest, nom), s.p.Donnees, now)
 	})
@@ -152,13 +158,16 @@ func (s *VaultService) repriseServeur(relancer bool) {
 	}
 }
 
-// ChooseBackupFolder change le dossier des sauvegardes. Renvoie false si annulé.
+// ChooseBackupFolder choisit le dossier des sauvegardes. Renvoie false si annulé.
 func (s *VaultService) ChooseBackupFolder() (bool, error) {
 	cfg, err := s.lireConfig()
 	if err != nil {
 		return false, err
 	}
-	actuel, _ := dossierSauvegarde(cfg)
+	actuel := cfg.DossierSauvegarde
+	if actuel == "" {
+		actuel = paths.Documents()
+	}
 	dir, err := s.app.Dialog.OpenFile().
 		SetTitle("Dossier des sauvegardes (idéalement OneDrive ou un autre disque)").
 		CanChooseFiles(false).
@@ -185,11 +194,13 @@ func (s *VaultService) OpenBackupFolder() error {
 	if err != nil {
 		return err
 	}
-	dir, _ := dossierSauvegarde(cfg)
-	if err := os.MkdirAll(dir, 0o700); err != nil {
+	if cfg.DossierSauvegarde == "" {
+		return ErrDossierNonChoisi
+	}
+	if err := os.MkdirAll(cfg.DossierSauvegarde, 0o700); err != nil {
 		return err
 	}
-	return s.app.Browser.OpenFile(dir)
+	return s.app.Browser.OpenFile(cfg.DossierSauvegarde)
 }
 
 // SetDailyBackup active ou non la sauvegarde quotidienne.
@@ -209,8 +220,8 @@ func (s *VaultService) SetDailyBackup(on bool) error {
 func (s *VaultService) boucleQuotidienne(ctx context.Context) {
 	verifier := func() {
 		cfg, err := s.lireConfig()
-		if err != nil || cfg.SansSauvegardeAuto || !s.moteur.Configure() {
-			return
+		if err != nil || cfg.SansSauvegardeAuto || cfg.DossierSauvegarde == "" || !s.moteur.Configure() {
+			return // pas de dossier choisi : la page Sauvegardes le signale
 		}
 		if time.Since(cfg.DerniereSauvegarde) < 24*time.Hour {
 			return
@@ -248,7 +259,10 @@ func (s *VaultService) ExportSettings(phrase string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	dir, _ := dossierSauvegarde(cfg)
+	dir := cfg.DossierSauvegarde
+	if dir == "" {
+		dir = paths.Documents()
+	}
 	dst, err := s.app.Dialog.SaveFile().
 		SetMessage("Enregistrer les réglages d'Aria Vault").
 		SetDirectory(paths.Existant(dir)).

@@ -7,6 +7,7 @@ package paths
 import (
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 // Paths regroupe les dossiers et fichiers utilisés par Aria.
@@ -28,10 +29,28 @@ func Default() (Paths, error) {
 	return In(filepath.Join(root, "AriaVaultwarden")), nil
 }
 
-// SauvegardesParDefaut est le dossier proposé pour les sauvegardes :
-// Documents\Aria Vault\Sauvegardes (Documents suit une redirection OneDrive).
-func SauvegardesParDefaut() string {
-	return filepath.Join(documents(), "Aria Vault", "Sauvegardes")
+// Documents renvoie le dossier Documents de l'utilisateur (redirection
+// OneDrive comprise) : point de départ des boîtes de dialogue.
+func Documents() string { return documents() }
+
+// SurOneDrive indique si p est dans un dossier synchronisé par OneDrive.
+func SurOneDrive(p string) bool {
+	for _, v := range []string{"OneDrive", "OneDriveConsumer", "OneDriveCommercial"} {
+		racine := os.Getenv(v)
+		if racine == "" {
+			continue
+		}
+		if rel, err := filepath.Rel(racine, p); err == nil && filepath.IsLocal(rel) || filepath.Clean(p) == filepath.Clean(racine) {
+			return true
+		}
+	}
+	return false
+}
+
+// MemeDisque indique si a et b sont sur le même lecteur (C:, D:…).
+func MemeDisque(a, b string) bool {
+	va, vb := filepath.VolumeName(a), filepath.VolumeName(b)
+	return va != "" && strings.EqualFold(va, vb)
 }
 
 // In construit les emplacements à partir d'un dossier de base.

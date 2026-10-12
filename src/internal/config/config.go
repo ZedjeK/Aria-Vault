@@ -22,7 +22,7 @@ type Config struct {
 	Inscriptions bool   `json:"inscriptions,omitempty"` // création de comptes autorisée
 
 	// Sauvegardes du coffre
-	DossierSauvegarde  string    `json:"dossierSauvegarde,omitempty"`  // vide = dossier par défaut
+	DossierSauvegarde  string    `json:"dossierSauvegarde,omitempty"`  // vide = pas encore choisi : aucune sauvegarde
 	SansSauvegardeAuto bool      `json:"sansSauvegardeAuto,omitempty"` // la quotidienne est active par défaut
 	DerniereSauvegarde time.Time `json:"derniereSauvegarde,omitzero"`
 }

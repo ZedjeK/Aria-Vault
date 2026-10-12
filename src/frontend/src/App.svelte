@@ -1,5 +1,6 @@
 <script>
   import { onMount } from 'svelte'
+  import { Events } from '@wailsio/runtime'
   import Icon from './lib/Icon.svelte'
   import Logo from './lib/Logo.svelte'
   import { app, refresh, refreshJournal, startPolling, openVault } from './lib/state.svelte.js'
@@ -24,6 +25,10 @@
     refresh()
     refreshJournal()
     startPolling()
+    // Le Go peut demander d'afficher une page (ex. sauvegarde lancée depuis l'icône sans dossier).
+    return Events.On('page', (e) => {
+      if (nav.some((n) => n.id === e.data)) app.page = e.data
+    })
   })
 </script>
 
