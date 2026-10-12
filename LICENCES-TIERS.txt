@@ -1,0 +1,54 @@
+Aria Vault embarque les logiciels suivants. Le code propre à Aria Vault est
+publié sous licence MIT (fichier LICENSE).
+
+
+== Composants embarqués et exécutés par Aria ==
+
+Vaultwarden
+  Serveur compatible Bitwarden, compilé depuis le source officiel sans
+  aucune modification. La version et le commit exacts figurent dans
+  BUILDINFO.txt et dans les notes de chaque release.
+  Licence  : GNU Affero General Public License v3.0 (AGPL-3.0)
+  Source   : https://github.com/dani-garcia/vaultwarden
+  Texte    : LICENCE-Vaultwarden-AGPL-3.0.txt (dans le zip de la release)
+
+Interface web (web vault)
+  Version open source des clients Bitwarden, compilée par le projet
+  bw_web_builds ; téléchargée depuis ses releases officielles et vérifiée
+  par SHA-256.
+  Licence  : GNU General Public License v3.0 (GPL-3.0)
+  Source   : https://github.com/dani-garcia/bw_web_builds
+             https://github.com/bitwarden/clients
+  Texte    : LICENCE-interface-web-GPL-3.0.txt (dans le zip de la release)
+
+
+== Bibliothèques compilées dans Aria-Vault.exe ==
+
+Wails v3                 MIT           https://github.com/wailsapp/wails
+CertMagic                Apache-2.0    https://github.com/caddyserver/certmagic
+ACMEz                    Apache-2.0    https://github.com/mholt/acmez
+ZeroSSL (Go)             MIT           https://github.com/caddyserver/zerossl
+libdns                   MIT           https://github.com/libdns/libdns
+libdns/duckdns           MIT           https://github.com/libdns/duckdns
+miekg/dns                BSD-3-Clause  https://github.com/miekg/dns
+zap, multierr (Uber)     MIT           https://github.com/uber-go/zap
+cpuid                    MIT           https://github.com/klauspost/cpuid
+BLAKE3 (zeebo)           CC0-1.0       https://github.com/zeebo/blake3
+xdg                      MIT           https://github.com/adrg/xdg
+go-ole                   MIT           https://github.com/go-ole/go-ole
+go-colorable, go-isatty  MIT           https://github.com/mattn
+golang.org/x (crypto, net, sys, text)
+                         BSD-3-Clause  https://cs.opensource.google/go/x
+
+
+== Interface ==
+
+Svelte                   MIT           https://github.com/sveltejs/svelte
+@wailsio/runtime         MIT           https://github.com/wailsapp/wails
+Space Grotesk            SIL Open Font License 1.1   https://github.com/floriankarsten/space-grotesk
+IBM Plex Mono            SIL Open Font License 1.1   https://github.com/IBM/plex
+  (polices embarquées via Fontsource : https://fontsource.org)
+
+
+Aria Vault n'est ni affilié ni approuvé par le projet Vaultwarden, ni par
+Bitwarden, Inc. « Bitwarden » est une marque de Bitwarden, Inc.

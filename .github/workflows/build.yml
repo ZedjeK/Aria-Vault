@@ -2,7 +2,10 @@
 # sur ta machine. Vaultwarden est compilé depuis le source officiel non modifié,
 # son interface web est vérifiée par checksum, puis les deux sont embarqués dans l'exe.
 #
-# Actions → Compiler Aria Vault → Run workflow. Version vide = dernière release officielle.
+# Actions → Compiler Aria Vault → Run workflow.
+#   - Vaultwarden vide = dernière release officielle.
+#   - « Publier la release » coché : crée la release v<version> (version lue dans
+#     build.ps1) avec le zip, les empreintes SHA-256 et l'attestation de provenance.
 
 name: Compiler Aria Vault
 
@@ -13,9 +16,13 @@ on:
         description: "Tag Vaultwarden (vide = dernière version officielle)"
         required: false
         default: ""
+      publier:
+        description: "Publier la release v<version> (version lue dans build.ps1)"
+        type: boolean
+        default: false
 
 permissions:
-  contents: read
+  contents: write # création de la release
   id-token: write # attestation Sigstore
   attestations: write
 
@@ -26,14 +33,31 @@ jobs:
     defaults:
       run:
         shell: pwsh
+    env:
+      GH_TOKEN: ${{ github.token }}
 
     steps:
       - uses: actions/checkout@v5
 
+      - name: Lire la version d'Aria
+        id: aria
+        run: |
+          $m = Select-String -Path build.ps1 -Pattern "\`$Version = '([^']+)'"
+          $v = $m.Matches[0].Groups[1].Value
+          if ($v -notmatch '^\d+\.\d+\.\d+$') { throw "Version invalide dans build.ps1 : '$v'" }
+          Write-Host "Aria Vault $v"
+          "version=$v" | Out-File $env:GITHUB_OUTPUT -Append
+
+      - name: Vérifier que la release n'existe pas déjà
+        if: inputs.publier
+        run: |
+          gh release view "v${{ steps.aria.outputs.version }}" 2>$null
+          if ($LASTEXITCODE -eq 0) { throw "La release v${{ steps.aria.outputs.version }} existe déjà : augmente la version dans build.ps1." }
+          $global:LASTEXITCODE = 0
+
       - name: Choisir la version de Vaultwarden
         id: vw
         env:
-          GH_TOKEN: ${{ github.token }}
           WANTED: ${{ inputs.vw_version }}
         run: |
           $v = $env:WANTED.Trim()
@@ -56,8 +80,10 @@ jobs:
         run: |
           $m = Select-String -Path vw-src/docker/DockerSettings.yaml -Pattern 'vault_version:\s*"?([^"\s]+)'
           $v = $m.Matches[0].Groups[1].Value
-          Write-Host "web-vault appariée : $v"
+          $commit = git -C vw-src log -1 --format=%H
+          Write-Host "web-vault appariée : $v ; commit Vaultwarden : $commit"
           "version=$v" | Out-File $env:GITHUB_OUTPUT -Append
+          "commit=$commit" | Out-File $env:GITHUB_OUTPUT -Append
 
       - uses: dtolnay/rust-toolchain@stable
         with:
@@ -130,17 +156,23 @@ jobs:
         run: go test ./internal/...
 
       - name: Compiler Aria-Vault.exe
-        run: ./build.ps1 -Vaultwarden vw-dist -VaultwardenVersion ${{ steps.vw.outputs.version }}
+        run: ./build.ps1 -Vaultwarden vw-dist -VaultwardenVersion ${{ steps.vw.outputs.version }} -Version ${{ steps.aria.outputs.version }}
 
       - name: Assembler
+        id: dist
         run: |
-          New-Item -ItemType Directory -Force dist | Out-Null
-          Copy-Item Aria-Vault.exe dist/
+          $v = "${{ steps.aria.outputs.version }}"
+          New-Item -ItemType Directory -Force dist, release | Out-Null
+          Copy-Item Aria-Vault.exe, LICENSE, LICENCES-TIERS.txt dist/
+          # Textes complets des licences des composants embarqués
+          Copy-Item vw-src/LICENSE.txt dist/LICENCE-Vaultwarden-AGPL-3.0.txt
+          Invoke-WebRequest https://www.gnu.org/licenses/gpl-3.0.txt -OutFile dist/LICENCE-interface-web-GPL-3.0.txt
+
           $sha = (Get-FileHash dist/Aria-Vault.exe -Algorithm SHA256).Hash.ToLower()
           @"
-          Aria Vault
+          Aria Vault $v
           Commit Aria         : $env:GITHUB_SHA
-          Vaultwarden         : ${{ steps.vw.outputs.version }} ($(git -C vw-src log -1 --format=%H))
+          Vaultwarden         : ${{ steps.vw.outputs.version }} (${{ steps.vault.outputs.commit }})
           Interface web       : ${{ steps.vault.outputs.version }}
           Toolchains          : $(rustc --version) / $(go version) / node $(node --version)
           SHA256 Aria-Vault.exe :
@@ -148,12 +180,35 @@ jobs:
           "@ | Out-File dist/BUILDINFO.txt -Encoding utf8
           Get-Content dist/BUILDINFO.txt
 
+          $zip = "release/Aria-Vault-$v.zip"
+          Compress-Archive -Path dist/* -DestinationPath $zip
+          $zsha = (Get-FileHash $zip -Algorithm SHA256).Hash.ToLowerInvariant()
+          "exe=$sha" | Out-File $env:GITHUB_OUTPUT -Append
+          "zip=$zsha" | Out-File $env:GITHUB_OUTPUT -Append
+
       - uses: actions/attest-build-provenance@v2
         with:
-          subject-path: dist/Aria-Vault.exe
+          subject-path: |
+            dist/Aria-Vault.exe
+            release/*.zip
 
       - uses: actions/upload-artifact@v4
         with:
-          name: Aria-Vault-vw${{ steps.vw.outputs.version }}
+          name: Aria-Vault-${{ steps.aria.outputs.version }}-vw${{ steps.vw.outputs.version }}
           path: dist/
           if-no-files-found: error
+
+      - name: Publier la release
+        if: inputs.publier
+        run: |
+          $v = "${{ steps.aria.outputs.version }}"
+          $notes = Get-Content .github/release-notes.md -Raw -Encoding utf8
+          $notes = $notes.Replace('{VERSION}', $v).Replace('{VW_VERSION}', '${{ steps.vw.outputs.version }}')
+          $notes = $notes.Replace('{VW_COMMIT}', '${{ steps.vault.outputs.commit }}').Replace('{WEBVAULT}', '${{ steps.vault.outputs.version }}')
+          $notes = $notes.Replace('{REPO_URL}', "$env:GITHUB_SERVER_URL/$env:GITHUB_REPOSITORY").Replace('{OWNER}', "$env:GITHUB_REPOSITORY_OWNER")
+          $notes += "`n## Empreintes SHA-256`n`n" + '```' + "`n" +
+            "${{ steps.dist.outputs.zip }}  Aria-Vault-$v.zip`n" +
+            "${{ steps.dist.outputs.exe }}  Aria-Vault.exe (dans le zip)`n" + '```' + "`n"
+          Set-Content notes.md $notes -Encoding utf8NoBOM -NoNewline
+          Get-Content notes.md
+          gh release create "v$v" (Get-ChildItem release/*.zip).FullName --title "Aria Vault $v" --notes-file notes.md --target $env:GITHUB_SHA
