@@ -72,7 +72,7 @@
       </p>
     </div>
     <div class="hero-logo" class:on={etat === 'actif'}>
-      <Logo size={150} dim={etat !== 'actif'} label="Logo Aria Vaultwarden" />
+      <Logo size={150} dim={etat !== 'actif'} label="Logo Aria Vault" />
     </div>
   </section>
 

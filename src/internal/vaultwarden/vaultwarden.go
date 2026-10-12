@@ -24,7 +24,7 @@ import (
 	"sync"
 	"time"
 
-	"aria-vaultwarden/internal/ports"
+	"aria-vault/internal/ports"
 )
 
 // Les deux archives sont produites par build.ps1 (ou la CI) et ne sont pas

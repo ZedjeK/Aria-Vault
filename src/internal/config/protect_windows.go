@@ -9,7 +9,7 @@ import (
 )
 
 // Chiffrement DPAPI lié au compte Windows courant.
-const dpapiName = "Aria Vaultwarden"
+const dpapiName = "Aria Vault"
 
 func protect(plain []byte) ([]byte, error) {
 	if len(plain) == 0 {

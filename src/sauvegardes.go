@@ -8,11 +8,11 @@ import (
 	"path/filepath"
 	"time"
 
-	"aria-vaultwarden/internal/config"
-	"aria-vaultwarden/internal/journal"
-	"aria-vaultwarden/internal/moteur"
-	"aria-vaultwarden/internal/paths"
-	"aria-vaultwarden/internal/sauvegarde"
+	"aria-vault/internal/config"
+	"aria-vault/internal/journal"
+	"aria-vault/internal/moteur"
+	"aria-vault/internal/paths"
+	"aria-vault/internal/sauvegarde"
 )
 
 // ErrDossierNonChoisi : aucune sauvegarde tant qu'aucun dossier n'est choisi.

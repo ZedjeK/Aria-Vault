@@ -7,14 +7,14 @@ import (
 
 	"github.com/wailsapp/wails/v3/pkg/application"
 
-	"aria-vaultwarden/internal/config"
-	"aria-vaultwarden/internal/journal"
-	"aria-vaultwarden/internal/moteur"
-	"aria-vaultwarden/internal/paths"
-	"aria-vaultwarden/internal/vaultwarden"
+	"aria-vault/internal/config"
+	"aria-vault/internal/journal"
+	"aria-vault/internal/moteur"
+	"aria-vault/internal/paths"
+	"aria-vault/internal/vaultwarden"
 )
 
-// VaultService expose au frontend les actions d'Aria Vaultwarden.
+// VaultService expose au frontend les actions d'Aria Vault.
 type VaultService struct {
 	p      paths.Paths
 	j      *journal.Journal

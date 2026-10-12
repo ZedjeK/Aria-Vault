@@ -21,7 +21,7 @@ import (
 	"github.com/libdns/duckdns"
 	"go.uber.org/zap"
 
-	"aria-vaultwarden/internal/ports"
+	"aria-vault/internal/ports"
 )
 
 // Options règle le relais HTTPS.

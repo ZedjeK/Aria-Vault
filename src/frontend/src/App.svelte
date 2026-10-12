@@ -82,7 +82,7 @@
         </span>
         <span class="open-arrow label" aria-hidden="true">↗</span>
       </button>
-      <span class="version label">aria-vaultwarden {version ? `v${version}` : ''}</span>
+      <span class="version label">aria-vault {version ? `v${version}` : ''}</span>
     </div>
   </nav>
 

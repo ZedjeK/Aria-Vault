@@ -1,4 +1,4 @@
-﻿# Aria Vaultwarden : compile Aria-Vaultwarden.exe.
+﻿# Aria Vault : compile Aria-Vault.exe.
 # Normalement lancé par la CI (.github/workflows/build.yml), qui compile
 # Vaultwarden depuis le source officiel dani-garcia/vaultwarden et récupère
 # l'interface web officielle vérifiée par checksum, puis appelle ce script.
@@ -10,7 +10,7 @@
 param(
     [Parameter(Mandatory = $true)] [string] $Vaultwarden,
     [string] $VaultwardenVersion = '',
-    [string] $Version = '0.3.2'
+    [string] $Version = '0.4.0'
 )
 
 $ErrorActionPreference = 'Stop'
@@ -81,22 +81,22 @@ try {
         '--arch', 'amd64',
         '--manifest', 'gui',
         '--icon', 'build\icon.ico',
-        '--product-name', 'Aria Vaultwarden',
-        '--file-description', 'Aria Vaultwarden',
+        '--product-name', 'Aria Vault',
+        '--file-description', 'Aria Vault',
         '--product-version', $Version,
         '--file-version', $Version,
         '--copyright', '© 2026 ZedjeK · licence MIT',
-        '--original-filename', 'Aria-Vaultwarden.exe',
+        '--original-filename', 'Aria-Vault.exe',
         '--out', 'rsrc')
 
     Step 'Compilation'
     $env:GOOS = 'windows'
     $env:GOARCH = 'amd64'
-    Invoke-Native 'go' @('build', '-trimpath', '-ldflags', "-H windowsgui -s -w -X main.version=$Version", '-o', (Join-Path $Root 'Aria-Vaultwarden.exe'), '.')
+    Invoke-Native 'go' @('build', '-trimpath', '-ldflags', "-H windowsgui -s -w -X main.version=$Version", '-o', (Join-Path $Root 'Aria-Vault.exe'), '.')
 } finally {
     Remove-Item Env:GOOS, Env:GOARCH -ErrorAction SilentlyContinue
     Pop-Location
 }
 
 Step 'Terminé'
-Write-Host "  Exe prêt : $(Join-Path $Root 'Aria-Vaultwarden.exe')" -ForegroundColor Green
+Write-Host "  Exe prêt : $(Join-Path $Root 'Aria-Vault.exe')" -ForegroundColor Green

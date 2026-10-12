@@ -1,4 +1,4 @@
-// Aria Vaultwarden : Vaultwarden et son HTTPS dans un seul exe Windows.
+// Aria Vault : Vaultwarden et son HTTPS dans un seul exe Windows.
 //
 // Deux modes :
 //   - silencieux (--silencieux, utilisé au démarrage de session) : le coffre
@@ -19,9 +19,11 @@ import (
 	"github.com/wailsapp/wails/v3/pkg/application"
 	"github.com/wailsapp/wails/v3/pkg/events"
 
-	"aria-vaultwarden/internal/journal"
-	"aria-vaultwarden/internal/moteur"
-	"aria-vaultwarden/internal/paths"
+	"aria-vault/internal/demarrage"
+	"aria-vault/internal/journal"
+	"aria-vault/internal/moteur"
+	"aria-vault/internal/paths"
+	"aria-vault/internal/releve"
 )
 
 //go:embed all:frontend/dist
@@ -44,18 +46,32 @@ const argSilencieux = "--silencieux"
 func main() {
 	silencieux := slices.Contains(os.Args[1:], argSilencieux)
 
-	p, err := paths.Default()
+	racine, err := paths.Racine()
 	if err != nil {
 		log.Fatal(err)
 	}
+	// 1. Une version plus ancienne encore lancée laisse la place (avant tout
+	//    accès au dossier, qu'elle peut encore tenir ouvert).
+	releves := releve.Reprendre(filepath.Join(racine, paths.Dossier), version)
+	// 2. Ancien dossier AriaVaultwarden renommé en AriaVault si besoin.
+	p, migration, errMigration := paths.Migrer(racine)
 	if err := os.MkdirAll(p.Base, 0o700); err != nil {
 		log.Fatal(err)
 	}
 	j := journal.New(filepath.Join(p.Base, "aria.log"))
 	if silencieux {
-		j.Add(journal.Info, "Aria Vaultwarden %s lancé en mode silencieux", version)
+		j.Add(journal.Info, "Aria Vault %s lancé en mode silencieux", version)
 	} else {
-		j.Add(journal.Info, "Aria Vaultwarden %s lancé", version)
+		j.Add(journal.Info, "Aria Vault %s lancé", version)
+	}
+	for _, m := range releves {
+		j.Add(journal.Info, "%s", m)
+	}
+	if migration != "" {
+		j.Add(journal.OK, "%s", migration)
+	}
+	if errMigration != nil {
+		j.Add(journal.Erreur, "%v", errMigration)
 	}
 
 	var (
@@ -76,25 +92,51 @@ func main() {
 	}
 
 	app := application.New(application.Options{
-		Name:        "Aria Vaultwarden",
+		Name:        "Aria Vault",
 		Description: "Ton coffre Vaultwarden en HTTPS, depuis la zone de notification",
 		Icon:        appIcon,
 		Services:    []application.Service{application.NewService(svc)},
 		Assets:      application.AssetOptions{Handler: application.AssetFileServerFS(assets)},
 		SingleInstance: &application.SingleInstanceOptions{
-			UniqueID: "io.github.zedjek.ariavaultwarden",
+			UniqueID: "io.github.zedjek.ariavault",
 			// Relancer l'exe (double-clic, raccourci) montre la fenêtre déjà ouverte.
 			OnSecondInstanceLaunch: func(application.SecondInstanceData) {
 				application.InvokeAsync(montrer)
 			},
 		},
-		Windows: application.WindowsOptions{DisableQuitOnLastWindowClosed: true},
+		Windows: application.WindowsOptions{
+			DisableQuitOnLastWindowClosed: true,
+			// Profil WebView2 rangé avec le reste, quel que soit le nom de l'exe.
+			WebviewUserDataPath: filepath.Join(p.Base, "webview"),
+		},
 		OnShutdown: func() {
 			arreter()
+			// Une sauvegarde ou une restauration en cours se termine d'abord.
+			svc.svgMu.Lock()
+			defer svc.svgMu.Unlock()
 			svc.moteur.Stop()
+			releve.Effacer(p.Base)
 		},
 	})
 	svc.app = app
+
+	// Ici, on est l'instance principale (Wails a déjà arrêté les doublons).
+	if exe, err := executable(); err == nil {
+		if msg, err := demarrage.Aligner(exe, argSilencieux); err != nil {
+			j.Add(journal.Erreur, "Lancement à l'ouverture de session : %v", err)
+		} else if msg != "" {
+			j.Add(journal.Info, "%s", msg)
+		}
+	}
+	if err := releve.Enregistrer(p.Base, version); err != nil {
+		j.Add(journal.Erreur, "instance.json : %v", err)
+	}
+	if err := releve.EcouterFermeture(func() {
+		j.Add(journal.Info, "Une version plus récente prend le relais : fermeture")
+		app.Quit()
+	}); err != nil {
+		j.Add(journal.Erreur, "Relève par une nouvelle version indisponible : %v", err)
+	}
 
 	// Icône, info-bulle et menu suivent l'état du coffre.
 	majTray := func() {
@@ -102,14 +144,14 @@ func main() {
 			return
 		}
 		s := svc.moteur.Status()
-		icon, tip, action := trayOff, "Aria Vaultwarden · serveur arrêté", "Démarrer le serveur"
+		icon, tip, action := trayOff, "Aria Vault · serveur arrêté", "Démarrer le serveur"
 		switch s.Etat {
 		case moteur.Actif:
-			icon, tip, action = trayOn, "Aria Vaultwarden · en ligne : "+s.Domaine, "Arrêter le serveur"
+			icon, tip, action = trayOn, "Aria Vault · en ligne : "+s.Domaine, "Arrêter le serveur"
 		case moteur.Demarrage:
-			tip, action = "Aria Vaultwarden · démarrage…", "Arrêter le serveur"
+			tip, action = "Aria Vault · démarrage…", "Arrêter le serveur"
 		case moteur.Erreur:
-			tip = "Aria Vaultwarden · erreur : " + s.Detail
+			tip = "Aria Vault · erreur : " + s.Detail
 		}
 		if r := []rune(tip); len(r) > 120 { // limite de l'info-bulle Windows
 			tip = string(r[:119]) + "…"
@@ -123,7 +165,7 @@ func main() {
 
 	window = app.Window.NewWithOptions(application.WebviewWindowOptions{
 		Name:      "main",
-		Title:     "Aria Vaultwarden",
+		Title:     "Aria Vault",
 		Width:     980,
 		Height:    640,
 		MinWidth:  420,
@@ -141,7 +183,7 @@ func main() {
 	})
 
 	menu := app.NewMenu()
-	menu.Add("Ouvrir Aria Vaultwarden").OnClick(func(*application.Context) { montrer() })
+	menu.Add("Ouvrir Aria Vault").OnClick(func(*application.Context) { montrer() })
 	menu.Add("Ouvrir le coffre dans le navigateur").OnClick(func(*application.Context) {
 		if err := svc.OpenVault(); err != nil {
 			j.Add(journal.Erreur, "Ouverture du coffre : %v", err)
@@ -180,7 +222,7 @@ func main() {
 	tray.SetMenu(menu)
 	tray.OnClick(montrer)
 	tray.SetIcon(trayOff)
-	tray.SetTooltip("Aria Vaultwarden")
+	tray.SetTooltip("Aria Vault")
 
 	// Le coffre démarre une fois l'appli lancée (l'icône doit exister pour suivre son état).
 	app.Event.OnApplicationEvent(events.Common.ApplicationStarted, func(*application.ApplicationEvent) {
@@ -198,4 +240,16 @@ func main() {
 	if err := app.Run(); err != nil {
 		log.Fatal(err)
 	}
+}
+
+// executable renvoie le chemin de l'exe, comme le fait Wails pour le démarrage auto.
+func executable() (string, error) {
+	exe, err := os.Executable()
+	if err != nil {
+		return "", err
+	}
+	if r, err := filepath.EvalSymlinks(exe); err == nil {
+		return r, nil
+	}
+	return exe, nil
 }

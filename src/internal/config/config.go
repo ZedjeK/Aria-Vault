@@ -1,4 +1,4 @@
-// Package config lit et enregistre les réglages d'Aria Vaultwarden.
+// Package config lit et enregistre les réglages d'Aria Vault.
 // Le jeton DuckDNS est chiffré avec DPAPI : seul le compte Windows qui l'a
 // enregistré peut le relire.
 package config

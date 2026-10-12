@@ -5,8 +5,8 @@ import (
 	"strings"
 	"testing"
 
-	"aria-vaultwarden/internal/journal"
-	"aria-vaultwarden/internal/paths"
+	"aria-vault/internal/journal"
+	"aria-vault/internal/paths"
 )
 
 func TestStartSansConfiguration(t *testing.T) {

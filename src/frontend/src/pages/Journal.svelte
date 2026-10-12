@@ -21,7 +21,7 @@
   </div>
   <p class="page-intro">
     Les derniers événements d'Aria, de Vaultwarden et du certificat. Copie complète dans
-    <span class="mono">{app.status?.base ?? '%LOCALAPPDATA%\\AriaVaultwarden'}\aria.log</span>.
+    <span class="mono">{app.status?.base ?? '%LOCALAPPDATA%\\AriaVault'}\aria.log</span>.
   </p>
 
   <section class="card">

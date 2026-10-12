@@ -1,10 +1,10 @@
-# Compile Aria-Vaultwarden.exe sur un runner Windows de GitHub : rien à installer
+# Compile Aria-Vault.exe sur un runner Windows de GitHub : rien à installer
 # sur ta machine. Vaultwarden est compilé depuis le source officiel non modifié,
 # son interface web est vérifiée par checksum, puis les deux sont embarqués dans l'exe.
 #
-# Actions → Compiler Aria Vaultwarden → Run workflow. Version vide = dernière release officielle.
+# Actions → Compiler Aria Vault → Run workflow. Version vide = dernière release officielle.
 
-name: Compiler Aria Vaultwarden
+name: Compiler Aria Vault
 
 on:
   workflow_dispatch:
@@ -129,31 +129,31 @@ jobs:
         working-directory: src
         run: go test ./internal/...
 
-      - name: Compiler Aria-Vaultwarden.exe
+      - name: Compiler Aria-Vault.exe
         run: ./build.ps1 -Vaultwarden vw-dist -VaultwardenVersion ${{ steps.vw.outputs.version }}
 
       - name: Assembler
         run: |
           New-Item -ItemType Directory -Force dist | Out-Null
-          Copy-Item Aria-Vaultwarden.exe dist/
-          $sha = (Get-FileHash dist/Aria-Vaultwarden.exe -Algorithm SHA256).Hash.ToLower()
+          Copy-Item Aria-Vault.exe dist/
+          $sha = (Get-FileHash dist/Aria-Vault.exe -Algorithm SHA256).Hash.ToLower()
           @"
-          Aria Vaultwarden
+          Aria Vault
           Commit Aria         : $env:GITHUB_SHA
           Vaultwarden         : ${{ steps.vw.outputs.version }} ($(git -C vw-src log -1 --format=%H))
           Interface web       : ${{ steps.vault.outputs.version }}
           Toolchains          : $(rustc --version) / $(go version) / node $(node --version)
-          SHA256 Aria-Vaultwarden.exe :
+          SHA256 Aria-Vault.exe :
           $sha
           "@ | Out-File dist/BUILDINFO.txt -Encoding utf8
           Get-Content dist/BUILDINFO.txt
 
       - uses: actions/attest-build-provenance@v2
         with:
-          subject-path: dist/Aria-Vaultwarden.exe
+          subject-path: dist/Aria-Vault.exe
 
       - uses: actions/upload-artifact@v4
         with:
-          name: Aria-Vaultwarden-vw${{ steps.vw.outputs.version }}
+          name: Aria-Vault-vw${{ steps.vw.outputs.version }}
           path: dist/
           if-no-files-found: error

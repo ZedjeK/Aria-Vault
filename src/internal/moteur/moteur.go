@@ -11,11 +11,11 @@ import (
 
 	"go.uber.org/zap"
 
-	"aria-vaultwarden/internal/config"
-	"aria-vaultwarden/internal/journal"
-	"aria-vaultwarden/internal/paths"
-	"aria-vaultwarden/internal/tlsproxy"
-	"aria-vaultwarden/internal/vaultwarden"
+	"aria-vault/internal/config"
+	"aria-vault/internal/journal"
+	"aria-vault/internal/paths"
+	"aria-vault/internal/tlsproxy"
+	"aria-vault/internal/vaultwarden"
 )
 
 // Etat du coffre.

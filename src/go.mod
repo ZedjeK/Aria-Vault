@@ -1,4 +1,4 @@
-module aria-vaultwarden
+module aria-vault
 
 go 1.26.0
 
