@@ -66,6 +66,9 @@ func TestUntarRefuseLesEvasions(t *testing.T) {
 func TestEnvironment(t *testing.T) {
 	t.Setenv("ADMIN_TOKEN", "hérité")
 	t.Setenv("SIGNUPS_ALLOWED", "true")
+	t.Setenv("DISABLE_ADMIN_TOKEN", "true")
+	t.Setenv("IP_HEADER", "X-Client-IP")
+	t.Setenv("SystemRoot", `C:\Windows`)
 	env := environment("D", "W", Options{Domaine: "vault.exemple.duckdns.org", Port: 8000})
 	get := func(k string) (string, int) {
 		var v string
@@ -77,8 +80,13 @@ func TestEnvironment(t *testing.T) {
 		}
 		return v, n
 	}
-	if _, n := get("ADMIN_TOKEN"); n != 0 {
-		t.Error("ADMIN_TOKEN hérité de la session doit être écarté")
+	for _, k := range []string{"ADMIN_TOKEN", "DISABLE_ADMIN_TOKEN", "IP_HEADER"} {
+		if _, n := get(k); n != 0 {
+			t.Errorf("%s hérité de la session doit être écarté", k)
+		}
+	}
+	if v, n := get("SystemRoot"); v != `C:\Windows` || n != 1 {
+		t.Errorf("SystemRoot = %q (%d fois), indispensable à Vaultwarden sous Windows", v, n)
 	}
 	if v, n := get("SIGNUPS_ALLOWED"); v != "false" || n != 1 {
 		t.Errorf("SIGNUPS_ALLOWED = %q (%d fois)", v, n)

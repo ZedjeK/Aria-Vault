@@ -199,6 +199,25 @@ func (s *Server) stopLocked() {
 	}
 }
 
+// heritees liste les seules variables de la session transmises à Vaultwarden
+// (noms en majuscules : Windows ignore la casse). Une liste blanche plutôt
+// qu'une liste noire : Vaultwarden lit des dizaines de variables, et une seule
+// oubliée (DISABLE_ADMIN_TOKEN ouvrirait /admin sans authentification,
+// IP_HEADER tromperait le limiteur) suffirait à contourner les réglages d'Aria.
+var heritees = map[string]bool{
+	// Windows : sans SYSTEMROOT, Winsock refuse de démarrer.
+	"SYSTEMROOT": true, "SYSTEMDRIVE": true, "WINDIR": true, "COMSPEC": true,
+	"PATH": true, "PATHEXT": true, "TEMP": true, "TMP": true,
+	"USERPROFILE": true, "USERNAME": true, "USERDOMAIN": true, "COMPUTERNAME": true,
+	"HOMEDRIVE": true, "HOMEPATH": true, "APPDATA": true, "LOCALAPPDATA": true,
+	"PROGRAMDATA": true, "PROGRAMFILES": true,
+	"NUMBER_OF_PROCESSORS": true, "PROCESSOR_ARCHITECTURE": true,
+	// Autres systèmes (tests et compilation hors Windows).
+	"HOME": true, "TMPDIR": true, "LANG": true, "TZ": true,
+	// Proxy de sortie (icônes des sites, vérification des fuites de mots de passe).
+	"HTTP_PROXY": true, "HTTPS_PROXY": true, "NO_PROXY": true, "ALL_PROXY": true,
+}
+
 // environment construit la configuration de Vaultwarden.
 func environment(donnees, webVault string, opts Options) []string {
 	set := map[string]string{
@@ -217,13 +236,11 @@ func environment(donnees, webVault string, opts Options) []string {
 	var env []string
 	for _, kv := range os.Environ() {
 		k, _, _ := strings.Cut(kv, "=")
-		// On écarte toute config Vaultwarden héritée de la session, pour
-		// qu'Aria reste la seule source de réglages.
-		if _, ours := set[strings.ToUpper(k)]; ours || strings.EqualFold(k, "ENV_FILE") ||
-			strings.EqualFold(k, "DATABASE_URL") || strings.EqualFold(k, "ADMIN_TOKEN") {
-			continue
+		// Seules les variables système de la liste blanche passent : aucune
+		// config Vaultwarden héritée de la session, Aria reste la seule source.
+		if heritees[strings.ToUpper(k)] {
+			env = append(env, kv)
 		}
-		env = append(env, kv)
 	}
 	for k, v := range set {
 		env = append(env, k+"="+v)
