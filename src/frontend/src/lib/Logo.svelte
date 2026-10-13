@@ -54,7 +54,7 @@
     </g>
   </g>
   <!-- La mallette reste orange même quand le logo est éteint : Aria veille. -->
-  <g transform="translate(80 104) scale(1.18) translate(-80 -104)" filter="url(#{ref('g2')})">
+  <g transform="translate(80 104) scale(1.18) translate(-80 -104)" filter="url(#{ref('g')})">
     <path d="M74,96 v-4.5 a2 2 0 0 1 2,-2 h8 a2 2 0 0 1 2,2 v4.5" fill="none" stroke="#FF8A1F" stroke-width="2.4" />
     <rect x="65" y="96" width="30" height="22" rx="3" fill="#FF8A1F" />
     <g fill="#030812" opacity="0.6">
