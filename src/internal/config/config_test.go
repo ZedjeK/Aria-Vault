@@ -38,7 +38,12 @@ func TestSaveLoadIdentifiants(t *testing.T) {
 // Les réglages écrits par la v0.5 (jetonDuckDNS seul) restent valides.
 func TestAncienFormat(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "config.json")
-	ancien, _ := json.Marshal(map[string]any{"domaine": "exemple.duckdns.org", "jetonDuckDNS": []byte(jeton)})
+	// Comme la v0.5 : le jeton seul, chiffré avec DPAPI sous Windows.
+	enc, err := protect([]byte(jeton))
+	if err != nil {
+		t.Fatal(err)
+	}
+	ancien, _ := json.Marshal(map[string]any{"domaine": "exemple.duckdns.org", "jetonDuckDNS": enc})
 	if err := os.WriteFile(path, ancien, 0o600); err != nil {
 		t.Fatal(err)
 	}
