@@ -1,11 +1,21 @@
 <script>
   import Switch from '../lib/Switch.svelte'
-  import { app, start, stop, setAutostart, setInscriptions, openData } from '../lib/state.svelte.js'
+  import {
+    app, start, stop, setAutostart, setInscriptions, openData, setEmpecherVeille, setVerifMaj, checkUpdate, openRelease,
+    formatDateHeure,
+  } from '../lib/state.svelte.js'
 
   const st = $derived(app.status)
   const etat = $derived(st?.moteur?.etat ?? 'arrete')
   const running = $derived(etat === 'actif' || etat === 'demarrage')
   const label = { actif: 'En ligne', demarrage: 'Démarrage…', erreur: 'Erreur', arrete: 'Arrêté' }
+  const maj = $derived(st?.maj ?? {})
+  let verifiee = $state(false)
+
+  async function verifier() {
+    await checkUpdate()
+    verifiee = true
+  }
 </script>
 
 <div class="page">
@@ -73,8 +83,65 @@
         Le serveur ne tourne que pendant ta session Windows. Session fermée ou PC en veille : ton téléphone garde sa copie
         hors ligne et se resynchronise au retour.
       </p>
+
+      <div class="row">
+        <div class="row-text">
+          <span class="row-name">Empêcher la mise en veille</span>
+          <span class="row-detail">Tant que le serveur tourne, le PC ne s'endort pas tout seul.</span>
+        </div>
+        <Switch checked={st?.empecherVeille ?? false} disabled={app.busy} label="Empêcher la mise en veille" onchange={setEmpecherVeille} />
+      </div>
+      <p class="hint">
+        L'écran peut toujours s'éteindre, et tu peux toujours mettre le PC en veille toi-même (menu Démarrer, capot fermé).
+        {#if st?.empecherVeille}{st?.veilleBloquee ? 'Actif en ce moment.' : 'Inactif tant que le serveur est arrêté.'}{/if}
+      </p>
+    </section>
+
+    <section class="card">
+      <div class="card-head">
+        <h2>Mises à jour</h2>
+        {#if maj.disponible}<span class="pill on">{maj.version} disponible</span>{/if}
+      </div>
+      <div class="row">
+        <div class="row-text">
+          <span class="row-name">Vérifier les mises à jour</span>
+          <span class="row-detail">Une fois par jour, Aria regarde sur GitHub si une nouvelle version est sortie. Rien n'est téléchargé tout seul.</span>
+        </div>
+        <Switch checked={st?.verifMaj ?? true} disabled={app.busy} label="Vérifier les mises à jour" onchange={setVerifMaj} />
+      </div>
+      <div class="row">
+        <span class="row-name">Version installée</span>
+        <span class="value mono">{st?.version ?? ''}</span>
+      </div>
+      {#if maj.verifie && new Date(maj.verifie).getFullYear() > 2000}
+        <div class="row">
+          <span class="row-name">Dernière vérification</span>
+          <span class="value">{formatDateHeure(maj.verifie)}</span>
+        </div>
+      {/if}
+      {#if maj.erreur}<p class="hint warn-text">{maj.erreur}</p>{/if}
+      {#if maj.disponible}
+        <p class="hint">Télécharge le zip de la nouvelle version et lance-la : elle prend le relais toute seule, ton coffre et tes réglages sont conservés.</p>
+      {:else if verifiee && !maj.erreur}
+        <p class="hint">Tu as la dernière version.</p>
+      {/if}
+      <div class="actions">
+        {#if maj.disponible}
+          <button class="btn-primary grow" onclick={openRelease} disabled={app.busy}>Voir la {maj.version}</button>
+        {/if}
+        <button class="btn-ghost grow" onclick={verifier} disabled={app.busy}>{app.busy ? 'Vérification…' : 'Vérifier maintenant'}</button>
+      </div>
     </section>
   </div>
 
   {#if app.error}<p class="error" role="alert">{app.error}</p>{/if}
 </div>
+
+<style>
+  .warn-text {
+    color: var(--warn);
+  }
+  .mono {
+    font-family: var(--font-mono);
+  }
+</style>

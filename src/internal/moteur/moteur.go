@@ -12,6 +12,7 @@ import (
 	"go.uber.org/zap"
 
 	"aria-vault/internal/config"
+	"aria-vault/internal/dnsprov"
 	"aria-vault/internal/journal"
 	"aria-vault/internal/paths"
 	"aria-vault/internal/tlsproxy"
@@ -95,7 +96,11 @@ func (m *Moteur) Start() error {
 	if err := cfg.Valider(); err != nil {
 		return fmt.Errorf("configuration HTTPS incomplète : %w", err)
 	}
-	jeton, err := cfg.Jeton()
+	ids, err := cfg.Identifiants()
+	if err != nil {
+		return err
+	}
+	dns, err := dnsprov.Nouveau(cfg.FournisseurDNS(), ids)
 	if err != nil {
 		return err
 	}
@@ -115,11 +120,11 @@ func (m *Moteur) Start() error {
 	m.mu.Unlock()
 	m.onChange()
 
-	go m.run(ctx, gen, cfg, jeton, finished)
+	go m.run(ctx, gen, cfg, dns, finished)
 	return nil
 }
 
-func (m *Moteur) run(ctx context.Context, gen int, cfg *config.Config, jeton string, finished chan struct{}) {
+func (m *Moteur) run(ctx context.Context, gen int, cfg *config.Config, dns dnsprov.Client, finished chan struct{}) {
 	defer close(finished)
 
 	m.j.Add(journal.Info, "Démarrage du coffre pour %s", cfg.Domaine)
@@ -136,7 +141,7 @@ func (m *Moteur) run(ctx context.Context, gen int, cfg *config.Config, jeton str
 	m.setDetail(gen, "certificat HTTPS (jusqu'à quelques minutes la première fois)")
 	proxy, err := tlsproxy.Start(ctx, tlsproxy.Options{
 		Domaine:     cfg.Domaine,
-		Jeton:       jeton,
+		DNS:         dns,
 		Email:       cfg.Email,
 		Certificats: m.p.Certificats,
 		Ecoute:      ":443",

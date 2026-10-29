@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"aria-vault/internal/chiffre"
 	"aria-vault/internal/config"
 	"aria-vault/internal/journal"
 	"aria-vault/internal/moteur"
@@ -26,6 +27,7 @@ type BackupView struct {
 	Derniere   time.Time         `json:"derniere"`
 	Liste      []sauvegarde.Info `json:"liste"`
 	Garder     int               `json:"garder"`
+	Chiffrees  bool              `json:"chiffrees"` // les nouvelles sauvegardes sont chiffrées
 	Erreur     string            `json:"erreur"`
 }
 
@@ -39,6 +41,7 @@ func (s *VaultService) Backups() BackupView {
 	}
 	v.Dossier = cfg.DossierSauvegarde
 	v.Auto, v.Derniere = !cfg.SansSauvegardeAuto, cfg.DerniereSauvegarde
+	v.Chiffrees = cfg.SauvegardesChiffrees && len(cfg.PhraseChiffree) > 0
 	if v.Dossier == "" {
 		return v
 	}
@@ -64,15 +67,32 @@ func (s *VaultService) Backup() (sauvegarde.Info, error) {
 		return sauvegarde.Info{}, ErrDossierNonChoisi
 	}
 
+	phrase := ""
+	if cfg.SauvegardesChiffrees {
+		if phrase, err = cfg.PhraseSauvegarde(); err != nil {
+			s.j.Add(journal.Erreur, "Sauvegarde impossible : %v", err)
+			return sauvegarde.Info{}, err
+		}
+		if phrase == "" {
+			err := errors.New("sauvegardes chiffrées activées, mais aucune phrase enregistrée : choisis-la de nouveau")
+			s.j.Add(journal.Erreur, "Sauvegarde impossible : %v", err)
+			return sauvegarde.Info{}, err
+		}
+	}
+
 	enLigne := s.pauseServeur("sauvegarde")
-	info, err := sauvegarde.Creer(s.p.Donnees, dest, time.Now())
+	info, err := sauvegarde.Creer(s.p.Donnees, dest, time.Now(), phrase)
 	s.repriseServeur(enLigne)
 	if err != nil {
 		s.j.Add(journal.Erreur, "Sauvegarde impossible : %v", err)
 		return sauvegarde.Info{}, err
 	}
 
-	s.j.Add(journal.OK, "Sauvegarde créée : %s (%s)", info.Nom, taille(info.Taille))
+	if info.Chiffree {
+		s.j.Add(journal.OK, "Sauvegarde chiffrée créée : %s (%s)", info.Nom, taille(info.Taille))
+	} else {
+		s.j.Add(journal.OK, "Sauvegarde créée : %s (%s)", info.Nom, taille(info.Taille))
+	}
 	if supprimees, err := sauvegarde.Purger(dest, sauvegarde.Garder); err != nil {
 		s.j.Add(journal.Erreur, "Rotation des sauvegardes : %v", err)
 	} else if len(supprimees) > 0 {
@@ -84,22 +104,79 @@ func (s *VaultService) Backup() (sauvegarde.Info, error) {
 	return info, nil
 }
 
-// Restore remplace le coffre par une sauvegarde de la liste.
-func (s *VaultService) Restore(nom string) error {
+// RestoreResult : BesoinPhrase demande la phrase d'une sauvegarde chiffrée.
+type RestoreResult struct {
+	BesoinPhrase bool   `json:"besoinPhrase"`
+	Error        string `json:"error"`
+}
+
+// Restore remplace le coffre par une sauvegarde de la liste. Pour une
+// sauvegarde chiffrée, phrase vide = la phrase enregistrée sur ce PC.
+func (s *VaultService) Restore(nom, phrase string) RestoreResult {
 	if _, ok := sauvegarde.DateDe(nom); !ok {
-		return errors.New("nom de sauvegarde invalide")
+		return RestoreResult{Error: "nom de sauvegarde invalide"}
 	}
 	cfg, err := s.lireConfig()
 	if err != nil {
-		return err
+		return RestoreResult{Error: err.Error()}
 	}
 	dest := cfg.DossierSauvegarde
 	if dest == "" {
-		return ErrDossierNonChoisi
+		return RestoreResult{Error: ErrDossierNonChoisi.Error()}
 	}
-	return s.remplacerCoffre("Restauration de "+nom, func(now time.Time) (string, error) {
-		return sauvegarde.Restaurer(filepath.Join(dest, nom), s.p.Donnees, now)
+	enregistree := false
+	if sauvegarde.EstChiffree(nom) && phrase == "" {
+		phrase, _ = cfg.PhraseSauvegarde()
+		if phrase == "" {
+			return RestoreResult{BesoinPhrase: true}
+		}
+		enregistree = true
+	}
+	err = s.remplacerCoffre("Restauration de "+nom, func(now time.Time) (string, error) {
+		return sauvegarde.Restaurer(filepath.Join(dest, nom), s.p.Donnees, now, phrase)
 	})
+	switch {
+	case errors.Is(err, sauvegarde.ErrPhrase) && enregistree:
+		return RestoreResult{BesoinPhrase: true, Error: "cette sauvegarde a été chiffrée avec une autre phrase : saisis celle de l'époque"}
+	case errors.Is(err, sauvegarde.ErrPhrase):
+		return RestoreResult{BesoinPhrase: true, Error: "phrase incorrecte : rien n'a été modifié"}
+	case err != nil:
+		return RestoreResult{Error: err.Error()}
+	}
+	return RestoreResult{}
+}
+
+// SetBackupEncryption active (avec la phrase) ou désactive le chiffrement des
+// nouvelles sauvegardes. Les sauvegardes existantes ne sont pas modifiées.
+func (s *VaultService) SetBackupEncryption(on bool, phrase string) error {
+	if on {
+		if err := chiffre.VerifierPhrase(phrase); err != nil {
+			return err
+		}
+	}
+	var errPhrase error
+	err := s.majConfig(func(c *config.Config) {
+		if !on {
+			c.SauvegardesChiffrees = false
+			_ = c.SetPhraseSauvegarde("")
+			return
+		}
+		if errPhrase = c.SetPhraseSauvegarde(phrase); errPhrase == nil {
+			c.SauvegardesChiffrees = true
+		}
+	})
+	if err == nil {
+		err = errPhrase
+	}
+	if err != nil {
+		return err
+	}
+	if on {
+		s.j.Add(journal.OK, "Les prochaines sauvegardes seront chiffrées par ta phrase de passe")
+	} else {
+		s.j.Add(journal.Info, "Les prochaines sauvegardes ne seront plus chiffrées")
+	}
+	return nil
 }
 
 // ImportVault remplace le coffre par un ancien dossier data choisi par l'utilisateur.
@@ -246,7 +323,7 @@ func (s *VaultService) boucleQuotidienne(ctx context.Context) {
 	}
 }
 
-// ---------- Réglages d'Aria (domaine, e-mail, jeton) ----------
+// ---------- Réglages d'Aria (fournisseur, domaine, e-mail, identifiants) ----------
 
 // ExportSettings enregistre les réglages dans un fichier choisi par l'utilisateur.
 // Renvoie false si annulé.
@@ -310,18 +387,21 @@ func (s *VaultService) ImportSettings(phrase string) ImportResult {
 	if err != nil {
 		return ImportResult{Error: err.Error()}
 	}
-	// Le jeton est validé avant toute écriture : rien n'est modifié en cas d'erreur.
+	// Les identifiants sont validés et rechiffrés (DPAPI, pour ce compte) avant
+	// toute écriture : rien n'est modifié en cas d'erreur.
 	var nouvelle config.Config
-	if err := nouvelle.SetJeton(imp.Jeton); err != nil { // rechiffré avec DPAPI pour ce compte
-		return ImportResult{Error: err.Error()}
+	if errs := nouvelle.SetIdentifiants(imp.Fournisseur, imp.Identifiants); len(errs) > 0 {
+		return ImportResult{Error: "identifiants DNS invalides dans le fichier"}
 	}
 	err = s.majConfig(func(c *config.Config) {
-		c.Domaine, c.Email, c.JetonChiffre = imp.Domaine, imp.Email, nouvelle.JetonChiffre
+		c.Domaine, c.Email = imp.Domaine, imp.Email
+		c.Fournisseur, c.IdentifiantsChiffres, c.JetonChiffre = nouvelle.Fournisseur, nouvelle.IdentifiantsChiffres, nil
 	})
 	if err != nil {
 		return ImportResult{Error: err.Error()}
 	}
-	s.j.Add(journal.OK, "Réglages importés pour %s, jeton compris", imp.Domaine)
+	s.j.Add(journal.OK, "Réglages importés pour %s, identifiants DNS compris", imp.Domaine)
+	s.demander(s.verifierIP)
 	if err := s.relancerSiActif(); err != nil {
 		return ImportResult{Domaine: imp.Domaine, Error: err.Error()}
 	}

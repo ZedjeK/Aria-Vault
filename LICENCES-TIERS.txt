@@ -30,6 +30,11 @@ ACMEz                    Apache-2.0    https://github.com/mholt/acmez
 ZeroSSL (Go)             MIT           https://github.com/caddyserver/zerossl
 libdns                   MIT           https://github.com/libdns/libdns
 libdns/duckdns           MIT           https://github.com/libdns/duckdns
+libdns/cloudflare        MIT           https://github.com/libdns/cloudflare
+libdns/ovh               MIT           https://github.com/libdns/ovh
+libdns/desec             MIT           https://github.com/libdns/desec
+go-ovh (OVH SAS)         BSD-3-Clause  https://github.com/ovh/go-ovh
+ini                      Apache-2.0    https://github.com/go-ini/ini
 miekg/dns                BSD-3-Clause  https://github.com/miekg/dns
 zap, multierr (Uber)     MIT           https://github.com/uber-go/zap
 cpuid                    MIT           https://github.com/klauspost/cpuid
@@ -37,7 +42,7 @@ BLAKE3 (zeebo)           CC0-1.0       https://github.com/zeebo/blake3
 xdg                      MIT           https://github.com/adrg/xdg
 go-ole                   MIT           https://github.com/go-ole/go-ole
 go-colorable, go-isatty  MIT           https://github.com/mattn
-golang.org/x (crypto, net, sys, text)
+golang.org/x (crypto, net, oauth2, sys, text)
                          BSD-3-Clause  https://cs.opensource.google/go/x
 
 

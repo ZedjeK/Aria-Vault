@@ -1,14 +1,24 @@
 package main
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"sync"
+	"sync/atomic"
+	"time"
 
+	"github.com/caddyserver/certmagic"
 	"github.com/wailsapp/wails/v3/pkg/application"
+	"go.uber.org/zap"
 
 	"aria-vault/internal/config"
+	"aria-vault/internal/dnsprov"
+	"aria-vault/internal/eveil"
+	"aria-vault/internal/ipdyn"
 	"aria-vault/internal/journal"
+	"aria-vault/internal/maj"
 	"aria-vault/internal/moteur"
 	"aria-vault/internal/paths"
 	"aria-vault/internal/vaultwarden"
@@ -20,43 +30,70 @@ type VaultService struct {
 	j      *journal.Journal
 	moteur *moteur.Moteur
 	app    *application.App // renseigné après application.New
+	ip     *ipdyn.Veilleur
+	maj    *maj.Verificateur
 
 	cfgMu sync.Mutex // protège config.json (lecture-modification-écriture)
 	svgMu sync.Mutex // une seule sauvegarde ou restauration à la fois
+
+	verifierIP     chan struct{} // demande une vérification de l'IP tout de suite
+	verifierMaj    chan struct{}
+	empecherVeille atomic.Bool
+}
+
+func nouveauService(p paths.Paths, j *journal.Journal) *VaultService {
+	return &VaultService{
+		p: p, j: j,
+		ip:          ipdyn.NouveauVeilleur(),
+		maj:         maj.Nouveau(version),
+		verifierIP:  make(chan struct{}, 1),
+		verifierMaj: make(chan struct{}, 1),
+	}
 }
 
 // View est l'état complet affiché par l'interface.
 type View struct {
-	Moteur          moteur.Status `json:"moteur"`
-	Configure       bool          `json:"configure"`
-	Domaine         string        `json:"domaine"`
-	Email           string        `json:"email"`
-	JetonEnregistre bool          `json:"jetonEnregistre"`
-	Inscriptions    bool          `json:"inscriptions"` // réglage enregistré
-	Autostart       bool          `json:"autostart"`
-	Version         string        `json:"version"`
-	Vaultwarden     string        `json:"vaultwarden"`
-	Donnees         string        `json:"donnees"`
-	Base            string        `json:"base"`
-	Erreur          string        `json:"erreur"` // config.json illisible
+	Moteur         moteur.Status `json:"moteur"`
+	Configure      bool          `json:"configure"`
+	Fournisseur    string        `json:"fournisseur"`
+	Domaine        string        `json:"domaine"`
+	Email          string        `json:"email"`
+	Identifiants   bool          `json:"identifiants"` // identifiants DNS enregistrés
+	Inscriptions   bool          `json:"inscriptions"` // réglage enregistré
+	Autostart      bool          `json:"autostart"`
+	IPAuto         bool          `json:"ipAuto"`
+	IP             ipdyn.Etat    `json:"ip"`
+	VerifMaj       bool          `json:"verifMaj"`
+	Maj            maj.Info      `json:"maj"`
+	EmpecherVeille bool          `json:"empecherVeille"`
+	VeilleBloquee  bool          `json:"veilleBloquee"` // en ce moment
+	Version        string        `json:"version"`
+	Vaultwarden    string        `json:"vaultwarden"`
+	Donnees        string        `json:"donnees"`
+	Base           string        `json:"base"`
+	Erreur         string        `json:"erreur"` // config.json illisible
 }
 
 // Status renvoie l'état de l'appli.
 func (s *VaultService) Status() View {
 	v := View{
-		Moteur:      s.moteur.Status(),
-		Version:     version,
-		Vaultwarden: vaultwarden.Version(),
-		Donnees:     s.p.Donnees,
-		Base:        s.p.Base,
+		Moteur:        s.moteur.Status(),
+		IP:            s.ip.Etat(),
+		Maj:           s.maj.Info(),
+		VeilleBloquee: eveil.Actif(),
+		Version:       version,
+		Vaultwarden:   vaultwarden.Version(),
+		Donnees:       s.p.Donnees,
+		Base:          s.p.Base,
 	}
 	cfg, err := s.lireConfig()
 	if err != nil {
 		v.Erreur = err.Error()
 	} else {
 		v.Configure = cfg.Valider() == nil
-		v.Domaine, v.Email, v.Inscriptions = cfg.Domaine, cfg.Email, cfg.Inscriptions
-		v.JetonEnregistre = len(cfg.JetonChiffre) > 0
+		v.Fournisseur, v.Domaine, v.Email, v.Inscriptions = cfg.FournisseurDNS(), cfg.Domaine, cfg.Email, cfg.Inscriptions
+		v.Identifiants = cfg.AIdentifiants()
+		v.IPAuto, v.VerifMaj, v.EmpecherVeille = !cfg.SansIPAuto, !cfg.SansVerifMaj, cfg.EmpecherVeille
 	}
 	if s.app != nil {
 		v.Autostart, _ = s.app.Autostart.IsEnabled()
@@ -64,14 +101,18 @@ func (s *VaultService) Status() View {
 	return v
 }
 
+// Fournisseurs renvoie les fournisseurs DNS et leurs tutoriels.
+func (s *VaultService) Fournisseurs() []dnsprov.Fournisseur { return dnsprov.Liste() }
+
 // Journal renvoie les derniers événements.
 func (s *VaultService) Journal() []journal.Entry { return s.j.Entries() }
 
 // ConfigInput est le formulaire de la page HTTPS.
 type ConfigInput struct {
-	Domaine string `json:"domaine"`
-	Jeton   string `json:"jeton"` // vide = garder l'actuel
-	Email   string `json:"email"`
+	Fournisseur  string            `json:"fournisseur"`
+	Domaine      string            `json:"domaine"`
+	Identifiants map[string]string `json:"identifiants"` // champ vide = garder la valeur enregistrée
+	Email        string            `json:"email"`
 }
 
 // SaveResult renvoie les erreurs par champ, ou une erreur générale.
@@ -96,18 +137,35 @@ func (s *VaultService) SaveConfig(in ConfigInput) SaveResult {
 		return res
 	}
 
-	if d, err := config.NormaliserDomaine(in.Domaine); err != nil {
+	f, ok := dnsprov.Trouver(in.Fournisseur)
+	if !ok {
+		res.Fields["fournisseur"] = "choisis un fournisseur DNS"
+		res.Error = "vérifie les champs signalés"
+		return res
+	}
+	if d, err := dnsprov.NormaliserDomaine(f.ID, in.Domaine); err != nil {
 		res.Fields["domaine"] = err.Error()
 	} else {
 		cfg.Domaine = d
 	}
-	if j := strings.TrimSpace(in.Jeton); j != "" {
-		if err := cfg.SetJeton(j); err != nil {
-			res.Fields["jeton"] = err.Error()
-		}
-	} else if len(cfg.JetonChiffre) == 0 {
-		res.Fields["jeton"] = "le jeton DuckDNS est obligatoire"
+
+	// Les champs laissés vides gardent leur valeur, si le fournisseur ne change pas.
+	ids := map[string]string{}
+	var anciens map[string]string
+	if cfg.AIdentifiants() && cfg.FournisseurDNS() == f.ID {
+		anciens, _ = cfg.Identifiants()
 	}
+	for _, c := range f.Champs {
+		v := strings.TrimSpace(in.Identifiants[c.Cle])
+		if v == "" {
+			v = anciens[c.Cle]
+		}
+		ids[c.Cle] = v
+	}
+	for k, v := range cfg.SetIdentifiants(f.ID, ids) {
+		res.Fields[k] = v
+	}
+
 	email := strings.TrimSpace(in.Email)
 	if email != "" && (!strings.Contains(email, "@") || strings.ContainsAny(email, " \t")) {
 		res.Fields["email"] = "adresse e-mail invalide"
@@ -125,7 +183,8 @@ func (s *VaultService) SaveConfig(in ConfigInput) SaveResult {
 		res.Error = err.Error()
 		return res
 	}
-	s.j.Add(journal.OK, "Configuration enregistrée pour %s (jeton chiffré pour ton compte Windows)", cfg.Domaine)
+	s.j.Add(journal.OK, "Configuration enregistrée pour %s chez %s (identifiants chiffrés pour ton compte Windows)", cfg.Domaine, f.Nom)
+	s.demander(s.verifierIP)
 	if err := s.relancerSiActif(); err != nil {
 		res.Error = err.Error()
 	}
@@ -185,6 +244,30 @@ func (s *VaultService) OpenVault() error {
 // OpenDataFolder ouvre le dossier du coffre dans l'Explorateur.
 func (s *VaultService) OpenDataFolder() error { return s.app.Browser.OpenFile(s.p.Donnees) }
 
+// OpenLink ouvre un lien de tutoriel. Seuls les liens connus sont acceptés.
+func (s *VaultService) OpenLink(url string) error {
+	for _, f := range dnsprov.Liste() {
+		for _, e := range f.Tutoriel {
+			if e.Lien != "" && e.Lien == url {
+				return s.app.Browser.OpenURL(url)
+			}
+		}
+	}
+	for _, l := range liensBox {
+		if l == url {
+			return s.app.Browser.OpenURL(url)
+		}
+	}
+	return errors.New("lien inconnu")
+}
+
+// Interfaces d'administration des box, ouvertes depuis le tutoriel de réservation d'IP.
+var liensBox = []string{
+	"http://mafreebox.freebox.fr",
+	"http://192.168.1.1",
+	"https://mabbox.bytel.fr",
+}
+
 // relancerSiActif applique un réglage en relançant le coffre s'il tourne.
 func (s *VaultService) relancerSiActif() error {
 	switch s.moteur.Status().Etat {
@@ -192,4 +275,185 @@ func (s *VaultService) relancerSiActif() error {
 		return s.moteur.Restart()
 	}
 	return nil
+}
+
+func (s *VaultService) demander(c chan struct{}) {
+	select {
+	case c <- struct{}{}:
+	default:
+	}
+}
+
+// ---------- IP publiée ----------
+
+// SetIPAuto active ou non la publication automatique de l'IP de ce PC.
+func (s *VaultService) SetIPAuto(on bool) error {
+	if err := s.majConfig(func(c *config.Config) { c.SansIPAuto = !on }); err != nil {
+		return err
+	}
+	if on {
+		s.j.Add(journal.Info, "Publication automatique de l'IP de ce PC activée")
+	} else {
+		s.j.Add(journal.Info, "Publication automatique de l'IP de ce PC désactivée")
+	}
+	s.demander(s.verifierIP)
+	return nil
+}
+
+// CheckIP vérifie l'adresse publiée tout de suite.
+func (s *VaultService) CheckIP() error {
+	_, err := s.passeIP(context.Background())
+	return err
+}
+
+// passeIP fait une vérification ; le booléen indique si quelque chose a changé.
+func (s *VaultService) passeIP(ctx context.Context) (bool, error) {
+	cfg, err := s.lireConfig()
+	if err != nil {
+		return false, err
+	}
+	var pub *dnsprov.Publieur
+	if cfg.Valider() == nil {
+		ids, _ := cfg.Identifiants()
+		client, err := dnsprov.Nouveau(cfg.FournisseurDNS(), ids)
+		if err != nil {
+			return false, err
+		}
+		pub = &dnsprov.Publieur{
+			ID: cfg.FournisseurDNS(), Domaine: cfg.Domaine, Client: client,
+			Zone: func(ctx context.Context, fqdn string) (string, error) {
+				return certmagic.FindZoneByFQDN(ctx, zap.NewNop(), fqdn, nil)
+			},
+		}
+	}
+	msg, err := s.ip.Verifier(ctx, pub, !cfg.SansIPAuto)
+	if msg != "" {
+		s.j.Add(journal.OK, "%s", msg)
+	}
+	return msg != "", err
+}
+
+// boucleIP vérifie l'adresse publiée au démarrage puis toutes les 10 minutes.
+func (s *VaultService) boucleIP(ctx context.Context) {
+	derniere := ""
+	t := time.NewTimer(5 * time.Second)
+	defer t.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-t.C:
+		case <-s.verifierIP:
+		}
+		_, err := s.passeIP(ctx)
+		// Une même erreur n'est notée qu'une fois, pas toutes les 10 minutes.
+		if msg := fmt.Sprint(err); err != nil && msg != derniere {
+			s.j.Add(journal.Erreur, "IP publiée : %v", err)
+			derniere = msg
+		} else if err == nil {
+			derniere = ""
+		}
+		if !t.Stop() {
+			select {
+			case <-t.C:
+			default:
+			}
+		}
+		t.Reset(ipdyn.Intervalle)
+	}
+}
+
+// ---------- Mises à jour ----------
+
+// SetVerifMaj active ou non la vérification quotidienne des nouvelles versions.
+func (s *VaultService) SetVerifMaj(on bool) error {
+	if err := s.majConfig(func(c *config.Config) { c.SansVerifMaj = !on }); err != nil {
+		return err
+	}
+	if on {
+		s.j.Add(journal.Info, "Vérification des mises à jour activée")
+		s.demander(s.verifierMaj)
+	} else {
+		s.maj.Oublier()
+		s.j.Add(journal.Info, "Vérification des mises à jour désactivée")
+	}
+	return nil
+}
+
+// CheckUpdate interroge GitHub tout de suite.
+func (s *VaultService) CheckUpdate() (maj.Info, error) {
+	info, err := s.maj.Verifier(context.Background())
+	if err == nil {
+		s.annoncerMaj(info)
+	}
+	return info, err
+}
+
+// OpenRelease ouvre la page de la nouvelle version.
+func (s *VaultService) OpenRelease() error {
+	info := s.maj.Info()
+	if info.URL == "" {
+		return errors.New("aucune nouvelle version connue")
+	}
+	return s.app.Browser.OpenURL(info.URL) // lien vérifié par maj.Lire
+}
+
+var majAnnoncee atomic.Value // version déjà notée dans le journal
+
+func (s *VaultService) annoncerMaj(info maj.Info) {
+	if info.Disponible && majAnnoncee.Swap(info.Version) != info.Version {
+		s.j.Add(journal.Info, "Aria Vault %s est disponible (tu as la %s)", info.Version, version)
+	}
+}
+
+// boucleMaj regarde une fois par jour si une nouvelle version est publiée.
+func (s *VaultService) boucleMaj(ctx context.Context) {
+	t := time.NewTimer(time.Minute)
+	defer t.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-t.C:
+		case <-s.verifierMaj:
+		}
+		if cfg, err := s.lireConfig(); err == nil && !cfg.SansVerifMaj {
+			if info, err := s.maj.Verifier(ctx); err == nil {
+				s.annoncerMaj(info)
+			}
+		}
+		if !t.Stop() {
+			select {
+			case <-t.C:
+			default:
+			}
+		}
+		t.Reset(maj.Intervalle)
+	}
+}
+
+// ---------- Veille ----------
+
+// SetEmpecherVeille empêche ou non la mise en veille tant que le serveur tourne.
+func (s *VaultService) SetEmpecherVeille(on bool) error {
+	if err := s.majConfig(func(c *config.Config) { c.EmpecherVeille = on }); err != nil {
+		return err
+	}
+	s.empecherVeille.Store(on)
+	if on {
+		s.j.Add(journal.Info, "Mise en veille automatique empêchée tant que le serveur tourne")
+	} else {
+		s.j.Add(journal.Info, "Mise en veille automatique de nouveau autorisée")
+	}
+	s.appliquerVeille()
+	return nil
+}
+
+// appliquerVeille suit l'état du serveur (appelé à chaque changement).
+func (s *VaultService) appliquerVeille() {
+	etat := s.moteur.Status().Etat
+	tourne := etat == moteur.Actif || etat == moteur.Demarrage
+	if err := eveil.Regler(s.empecherVeille.Load() && tourne); err != nil {
+		s.j.Add(journal.Erreur, "Blocage de la mise en veille : %v", err)
+	}
 }

@@ -38,6 +38,21 @@
               ? 'port 443, certificat Let\'s Encrypt'
               : 'à configurer',
     },
+    ...(configure
+      ? [
+          {
+            id: 'ip',
+            page: 'https',
+            tag: !st?.ip?.publiee ? 'wait' : st.ip.publiee === st.ip.locale?.ip ? 'ok' : 'alert',
+            name: 'adresse ip',
+            detail: !st?.ip?.publiee
+              ? 'vérification en cours'
+              : st.ip.publiee === st.ip.locale?.ip
+                ? `${st.ip.publiee}, celle de ce PC`
+                : `le domaine pointe vers ${st.ip.publiee}, ce PC est en ${st.ip.locale?.ip || '?'}`,
+          },
+        ]
+      : []),
     {
       id: 'autostart',
       page: 'reglages',
@@ -64,7 +79,7 @@
         {:else if etat === 'erreur'}
           {m.detail}. Détails dans le journal ; relance le serveur depuis Réglages.
         {:else if !configure}
-          Commence par la page HTTPS : ton nom de domaine et son jeton suffisent.
+          Commence par la page HTTPS : ton nom de domaine et les identifiants de ton fournisseur DNS suffisent, un tuto te guide.
         {:else}
           Le serveur est arrêté : ton téléphone garde sa copie hors ligne, mais ne peut plus se synchroniser. Démarre-le
           depuis Réglages, ou d'un clic droit sur l'icône Aria dans la zone de notification.
@@ -100,7 +115,7 @@
       <section class="control" aria-label="Premiers pas">
         <span class="eyebrow">Premiers pas</span>
         <button class="cta" onclick={() => (app.page = 'https')}>configurer https</button>
-        <p class="hint">Un nom de domaine et son jeton : c'est tout ce qu'il faut.</p>
+        <p class="hint">Un nom de domaine et ses identifiants DNS : un tuto te guide pas à pas.</p>
       </section>
     {/if}
   </div>

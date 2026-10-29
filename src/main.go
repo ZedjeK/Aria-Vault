@@ -19,11 +19,14 @@ import (
 	"github.com/wailsapp/wails/v3/pkg/application"
 	"github.com/wailsapp/wails/v3/pkg/events"
 
+	"aria-vault/internal/config"
 	"aria-vault/internal/demarrage"
+	"aria-vault/internal/eveil"
 	"aria-vault/internal/journal"
 	"aria-vault/internal/moteur"
 	"aria-vault/internal/paths"
 	"aria-vault/internal/releve"
+	"aria-vault/internal/sauvegarde"
 )
 
 //go:embed all:frontend/dist
@@ -73,13 +76,22 @@ func main() {
 	if errMigration != nil {
 		j.Add(journal.Erreur, "%v", errMigration)
 	}
+	// 3. Une restauration coupée en plein milieu (panne, plantage) est terminée.
+	if msg, err := sauvegarde.Reparer(p.Donnees); err != nil {
+		j.Add(journal.Erreur, "%v", err)
+	} else if msg != "" {
+		j.Add(journal.OK, "%s", msg)
+	}
 
 	var (
 		window *application.WebviewWindow
 		tray   *application.SystemTray
 		toggle *application.MenuItem
 	)
-	svc := &VaultService{p: p, j: j}
+	svc := nouveauService(p, j)
+	if cfg, err := config.Load(p.Config); err == nil {
+		svc.empecherVeille.Store(cfg.EmpecherVeille)
+	}
 	ctx, arreter := context.WithCancel(context.Background())
 
 	montrer := func() {
@@ -115,6 +127,7 @@ func main() {
 			svc.svgMu.Lock()
 			defer svc.svgMu.Unlock()
 			svc.moteur.Stop()
+			_ = eveil.Regler(false)
 			releve.Effacer(p.Base)
 		},
 	})
@@ -160,7 +173,10 @@ func main() {
 		tray.SetTooltip(tip)
 		toggle.SetLabel(action)
 	}
-	svc.moteur = moteur.New(p, j, func() { application.InvokeAsync(majTray) })
+	svc.moteur = moteur.New(p, j, func() {
+		svc.appliquerVeille()
+		application.InvokeAsync(majTray)
+	})
 	configure := svc.moteur.Configure()
 
 	window = app.Window.NewWithOptions(application.WebviewWindowOptions{
@@ -228,6 +244,8 @@ func main() {
 	app.Event.OnApplicationEvent(events.Common.ApplicationStarted, func(*application.ApplicationEvent) {
 		majTray()
 		go svc.boucleQuotidienne(ctx)
+		go svc.boucleIP(ctx)
+		go svc.boucleMaj(ctx)
 		if configure {
 			go func() {
 				if err := svc.moteur.Start(); err != nil {

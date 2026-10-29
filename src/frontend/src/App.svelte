@@ -3,7 +3,7 @@
   import { Events } from '@wailsio/runtime'
   import Icon from './lib/Icon.svelte'
   import Logo from './lib/Logo.svelte'
-  import { app, refresh, refreshJournal, startPolling, openVault } from './lib/state.svelte.js'
+  import { app, refresh, refreshJournal, startPolling, openVault, openRelease } from './lib/state.svelte.js'
   import Home from './pages/Home.svelte'
   import Https from './pages/Https.svelte'
   import Reglages from './pages/Reglages.svelte'
@@ -92,6 +92,12 @@
     {/if}
     {#if app.status?.erreur}
       <p class="banner" role="alert">{app.status.erreur}</p>
+    {/if}
+    {#if app.status?.maj?.disponible}
+      <div class="maj" role="status">
+        <span><strong>Aria Vault {app.status.maj.version}</strong> est disponible · tu as la {app.status.version}</span>
+        <button class="btn-primary small" onclick={openRelease} disabled={app.busy}>Voir la nouvelle version ↗</button>
+      </div>
     {/if}
 
     {#if app.page === 'home'}
@@ -300,6 +306,26 @@
     font-family: var(--font-mono);
     font-size: 11px;
     color: var(--faint);
+  }
+
+  .maj {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 10px;
+    max-width: 1100px;
+    padding: 10px 12px 10px 14px;
+    border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent);
+    border-radius: 10px 0;
+    corner-shape: bevel;
+    background: color-mix(in srgb, var(--accent) 7%, transparent);
+    font-size: 13px;
+    color: var(--muted);
+  }
+  .maj strong {
+    color: var(--accent);
+    font-weight: 600;
   }
 
   .content {

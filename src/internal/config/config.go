@@ -1,6 +1,7 @@
 // Package config lit et enregistre les réglages d'Aria Vault.
-// Le jeton DuckDNS est chiffré avec DPAPI : seul le compte Windows qui l'a
-// enregistré peut le relire.
+// Les identifiants du fournisseur DNS (et la phrase des sauvegardes chiffrées)
+// sont chiffrés avec DPAPI : seul le compte Windows qui les a enregistrés peut
+// les relire.
 package config
 
 import (
@@ -9,22 +10,33 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"regexp"
-	"strings"
 	"time"
+
+	"aria-vault/internal/dnsprov"
 )
 
 // Config est le contenu de config.json.
 type Config struct {
-	Domaine      string `json:"domaine"`
-	JetonChiffre []byte `json:"jetonDuckDNS,omitempty"` // DPAPI, encodé en base64 dans le JSON
-	Email        string `json:"email,omitempty"`        // facultatif : avertissements Let's Encrypt
-	Inscriptions bool   `json:"inscriptions,omitempty"` // création de comptes autorisée
+	Domaine              string `json:"domaine"`
+	Fournisseur          string `json:"fournisseur,omitempty"`  // vide = DuckDNS (réglages d'avant la v0.6)
+	IdentifiantsChiffres []byte `json:"identifiants,omitempty"` // DPAPI d'un objet JSON, encodé en base64
+	JetonChiffre         []byte `json:"jetonDuckDNS,omitempty"` // v0.5 et avant : jeton DuckDNS seul (DPAPI)
+	Email                string `json:"email,omitempty"`        // facultatif : avertissements Let's Encrypt
+	Inscriptions         bool   `json:"inscriptions,omitempty"` // création de comptes autorisée
+
+	// IP publiée automatiquement (activé par défaut)
+	SansIPAuto bool `json:"sansIPAuto,omitempty"`
 
 	// Sauvegardes du coffre
-	DossierSauvegarde  string    `json:"dossierSauvegarde,omitempty"`  // vide = pas encore choisi : aucune sauvegarde
-	SansSauvegardeAuto bool      `json:"sansSauvegardeAuto,omitempty"` // la quotidienne est active par défaut
-	DerniereSauvegarde time.Time `json:"derniereSauvegarde,omitzero"`
+	DossierSauvegarde    string    `json:"dossierSauvegarde,omitempty"`  // vide = pas encore choisi : aucune sauvegarde
+	SansSauvegardeAuto   bool      `json:"sansSauvegardeAuto,omitempty"` // la quotidienne est active par défaut
+	DerniereSauvegarde   time.Time `json:"derniereSauvegarde,omitzero"`
+	SauvegardesChiffrees bool      `json:"sauvegardesChiffrees,omitempty"`
+	PhraseChiffree       []byte    `json:"phraseSauvegardes,omitempty"` // DPAPI
+
+	// Divers
+	SansVerifMaj   bool `json:"sansVerifMaj,omitempty"`   // vérification quotidienne des nouvelles versions
+	EmpecherVeille bool `json:"empecherVeille,omitempty"` // le PC ne se met pas en veille tant que le serveur tourne
 }
 
 // Load lit config.json. Un fichier absent donne une configuration vide.
@@ -59,64 +71,100 @@ func (c *Config) Save(path string) error {
 	return os.Rename(tmp, path)
 }
 
-// SetJeton chiffre et mémorise le jeton DuckDNS.
-func (c *Config) SetJeton(jeton string) error {
-	jeton = strings.TrimSpace(jeton)
-	if !jetonRe.MatchString(jeton) {
-		return errors.New("le jeton DuckDNS doit ressembler à xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx")
+// FournisseurDNS renvoie le fournisseur choisi (DuckDNS pour les anciens réglages).
+func (c *Config) FournisseurDNS() string {
+	if c.Fournisseur == "" {
+		return dnsprov.DuckDNS
 	}
-	enc, err := protect([]byte(jeton))
+	return c.Fournisseur
+}
+
+// AIdentifiants indique si des identifiants DNS sont enregistrés.
+func (c *Config) AIdentifiants() bool {
+	return len(c.IdentifiantsChiffres) > 0 || len(c.JetonChiffre) > 0
+}
+
+// SetIdentifiants valide, chiffre et mémorise le fournisseur et ses identifiants.
+// Les erreurs sont renvoyées par champ.
+func (c *Config) SetIdentifiants(fournisseur string, ids map[string]string) map[string]string {
+	propres, erreurs := dnsprov.Valider(fournisseur, ids)
+	if len(erreurs) > 0 {
+		return erreurs
+	}
+	data, err := json.Marshal(propres)
 	if err != nil {
-		return fmt.Errorf("chiffrement du jeton : %w", err)
+		return map[string]string{"fournisseur": err.Error()}
 	}
-	c.JetonChiffre = enc
+	enc, err := protect(data)
+	if err != nil {
+		return map[string]string{"fournisseur": "chiffrement des identifiants : " + err.Error()}
+	}
+	c.Fournisseur, c.IdentifiantsChiffres, c.JetonChiffre = fournisseur, enc, nil
 	return nil
 }
 
-// Jeton déchiffre le jeton DuckDNS.
-func (c *Config) Jeton() (string, error) {
-	if len(c.JetonChiffre) == 0 {
-		return "", errors.New("aucun jeton DuckDNS enregistré")
+// Identifiants déchiffre les identifiants du fournisseur DNS.
+func (c *Config) Identifiants() (map[string]string, error) {
+	const autre = " (enregistrés par un autre compte Windows ?)"
+	switch {
+	case len(c.IdentifiantsChiffres) > 0:
+		plain, err := unprotect(c.IdentifiantsChiffres)
+		if err != nil {
+			return nil, fmt.Errorf("identifiants DNS indéchiffrables%s : %w", autre, err)
+		}
+		ids := map[string]string{}
+		if err := json.Unmarshal(plain, &ids); err != nil {
+			return nil, errors.New("identifiants DNS illisibles")
+		}
+		return ids, nil
+	case len(c.JetonChiffre) > 0:
+		plain, err := unprotect(c.JetonChiffre)
+		if err != nil {
+			return nil, fmt.Errorf("jeton DuckDNS indéchiffrable%s : %w", autre, err)
+		}
+		return map[string]string{"jeton": string(plain)}, nil
 	}
-	plain, err := unprotect(c.JetonChiffre)
+	return nil, errors.New("aucun identifiant DNS enregistré")
+}
+
+// SetPhraseSauvegarde mémorise (chiffrée avec DPAPI) la phrase des sauvegardes
+// chiffrées ; une phrase vide l'efface.
+func (c *Config) SetPhraseSauvegarde(phrase string) error {
+	if phrase == "" {
+		c.PhraseChiffree = nil
+		return nil
+	}
+	enc, err := protect([]byte(phrase))
 	if err != nil {
-		return "", fmt.Errorf("jeton DuckDNS indéchiffrable (enregistré par un autre compte Windows ?) : %w", err)
+		return fmt.Errorf("chiffrement de la phrase : %w", err)
+	}
+	c.PhraseChiffree = enc
+	return nil
+}
+
+// PhraseSauvegarde renvoie la phrase des sauvegardes chiffrées ("" si aucune).
+func (c *Config) PhraseSauvegarde() (string, error) {
+	if len(c.PhraseChiffree) == 0 {
+		return "", nil
+	}
+	plain, err := unprotect(c.PhraseChiffree)
+	if err != nil {
+		return "", fmt.Errorf("phrase des sauvegardes indéchiffrable (enregistrée par un autre compte Windows ?) : %w", err)
 	}
 	return string(plain), nil
 }
 
-var (
-	jetonRe   = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$`)
-	domaineRe = regexp.MustCompile(`^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.duckdns\.org$`)
-	labelRe   = regexp.MustCompile(`^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$`)
-)
-
-// NormaliserDomaine accepte « https://vault.exemple.duckdns.org/ » comme
-// « vault.exemple.duckdns.org » et vérifie qu'il s'agit d'un sous-domaine DuckDNS.
-func NormaliserDomaine(s string) (string, error) {
-	s = strings.ToLower(strings.TrimSpace(s))
-	s = strings.TrimPrefix(s, "https://")
-	s = strings.TrimPrefix(s, "http://")
-	s = strings.TrimSuffix(s, "/")
-	// DuckDNS gère aussi les sous-sous-domaines (vault.exemple.duckdns.org) :
-	// seul le dernier niveau avant duckdns.org est vérifié par l'expression.
-	parts := strings.Split(s, ".")
-	if len(parts) < 3 || !domaineRe.MatchString(strings.Join(parts[len(parts)-3:], ".")) {
-		return "", fmt.Errorf("%q n'est pas un sous-domaine DuckDNS (attendu : exemple.duckdns.org)", s)
-	}
-	for _, p := range parts[:len(parts)-3] {
-		if !labelRe.MatchString(p) {
-			return "", fmt.Errorf("%q contient un nom invalide", s)
-		}
-	}
-	return s, nil
-}
-
 // Valider vérifie que tout ce qu'il faut pour démarrer est présent.
 func (c *Config) Valider() error {
-	if _, err := NormaliserDomaine(c.Domaine); err != nil {
+	if _, err := dnsprov.NormaliserDomaine(c.FournisseurDNS(), c.Domaine); err != nil {
 		return err
 	}
-	_, err := c.Jeton()
-	return err
+	ids, err := c.Identifiants()
+	if err != nil {
+		return err
+	}
+	if _, erreurs := dnsprov.Valider(c.FournisseurDNS(), ids); len(erreurs) > 0 {
+		return errors.New("identifiants DNS incomplets : complète la page HTTPS")
+	}
+	return nil
 }

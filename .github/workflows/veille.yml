@@ -1,0 +1,79 @@
+# Veille Vaultwarden : chaque jour, regarde si dani-garcia/vaultwarden a publié
+# une nouvelle version. Si oui, augmente la version d'Aria (correctif) dans
+# build.ps1, puis lance « Compiler Aria Vault » en mode brouillon.
+#
+# Rien n'est publié automatiquement : le brouillon attend dans l'onglet
+# Releases, et c'est toi qui cliques sur « Publish release » après l'avoir relu.
+
+name: Veille Vaultwarden
+
+on:
+  schedule:
+    - cron: "17 5 * * *" # tous les jours vers 5 h 17 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: write # commit de la nouvelle version dans build.ps1
+  actions: write # lancement du workflow de compilation
+
+concurrency:
+  group: veille-vaultwarden
+  cancel-in-progress: false
+
+jobs:
+  veille:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+
+      - name: Comparer avec la dernière release d'Aria
+        id: cmp
+        run: |
+          set -euo pipefail
+          vw=$(gh release view -R dani-garcia/vaultwarden --json tagName -q .tagName)
+          [[ "$vw" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "Version Vaultwarden inattendue : '$vw'"; exit 1; }
+
+          # Dernière release d'Aria, brouillons compris (une veille déjà faite ne se refait pas).
+          body=$(gh api "repos/$GITHUB_REPOSITORY/releases?per_page=30" --jq 'sort_by(.created_at) | last | .body // ""')
+          embarque=$(grep -oP '\|\s*Vaultwarden\s*\|\s*\K[0-9]+\.[0-9]+\.[0-9]+' <<< "$body" | head -1 || true)
+          echo "Vaultwarden officiel : $vw ; dans la dernière release d'Aria : ${embarque:-inconnu}"
+
+          if [[ "$embarque" == "$vw" ]]; then
+            echo "À jour, rien à faire."
+            echo "nouveau=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "nouveau=true" >> "$GITHUB_OUTPUT"
+          echo "vw=$vw" >> "$GITHUB_OUTPUT"
+
+      - name: Augmenter la version d'Aria si elle est déjà sortie
+        if: steps.cmp.outputs.nouveau == 'true'
+        run: |
+          set -euo pipefail
+          v=$(grep -oP "\\\$Version = '\K[0-9]+\.[0-9]+\.[0-9]+" build.ps1)
+          tags=$(gh api "repos/$GITHUB_REPOSITORY/releases?per_page=100" --jq '.[].tag_name')
+          if grep -qx "v$v" <<< "$tags"; then
+            IFS=. read -r ma mi pa <<< "$v"
+            n="$ma.$mi.$((pa + 1))"
+            # sed travaille octet par octet : BOM et fins de ligne CRLF de build.ps1 sont conservés.
+            sed -i "s/\$Version = '$v'/\$Version = '$n'/" build.ps1
+            grep -q "\$Version = '$n'" build.ps1
+            git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+              commit -am "Vaultwarden ${{ steps.cmp.outputs.vw }} : Aria Vault $n"
+            git push
+            echo "Aria Vault $v → $n"
+          else
+            echo "La version $v n'est pas encore sortie : elle embarquera Vaultwarden ${{ steps.cmp.outputs.vw }}."
+          fi
+
+      - name: Compiler en brouillon
+        if: steps.cmp.outputs.nouveau == 'true'
+        run: |
+          gh workflow run build.yml --ref "${{ github.event.repository.default_branch }}" \
+            -f vw_version="${{ steps.cmp.outputs.vw }}" -f release=brouillon
+          echo "Compilation lancée : le brouillon apparaîtra dans Releases d'ici 20 à 40 minutes."

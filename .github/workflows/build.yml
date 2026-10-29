@@ -4,8 +4,11 @@
 #
 # Actions → Compiler Aria Vault → Run workflow.
 #   - Vaultwarden vide = dernière release officielle.
-#   - « Publier la release » coché : crée la release v<version> (version lue dans
-#     build.ps1) avec le zip, les empreintes SHA-256 et l'attestation de provenance.
+#   - Release « brouillon » : prépare la release v<version> (version lue dans
+#     build.ps1) avec le zip, les empreintes SHA-256 et l'attestation de
+#     provenance, sans la publier : un clic sur « Publish release » suffit.
+#     « publier » la rend publique tout de suite.
+#   - La veille Vaultwarden (veille.yml) lance ce workflow en brouillon.
 
 name: Compiler Aria Vault
 
@@ -16,10 +19,11 @@ on:
         description: "Tag Vaultwarden (vide = dernière version officielle)"
         required: false
         default: ""
-      publier:
-        description: "Publier la release v<version> (version lue dans build.ps1)"
-        type: boolean
-        default: false
+      release:
+        description: "Release v<version> (version lue dans build.ps1)"
+        type: choice
+        options: [aucune, brouillon, publier]
+        default: aucune
 
 permissions:
   contents: write # création de la release
@@ -35,6 +39,8 @@ jobs:
         shell: pwsh
     env:
       GH_TOKEN: ${{ github.token }}
+      # Signature SignPath : active dès que le secret SIGNPATH_API_TOKEN existe (voir docs/SIGNATURE.md).
+      SIGNPATH_ACTIF: ${{ secrets.SIGNPATH_API_TOKEN != '' }}
 
     steps:
       - uses: actions/checkout@v5
@@ -49,11 +55,11 @@ jobs:
           "version=$v" | Out-File $env:GITHUB_OUTPUT -Append
 
       - name: Vérifier que la release n'existe pas déjà
-        if: inputs.publier
+        if: inputs.release != 'aucune'
         run: |
-          gh release view "v${{ steps.aria.outputs.version }}" 2>$null
-          if ($LASTEXITCODE -eq 0) { throw "La release v${{ steps.aria.outputs.version }} existe déjà : augmente la version dans build.ps1." }
-          $global:LASTEXITCODE = 0
+          # La liste comprend les brouillons, que « gh release view » ne trouve pas.
+          $tags = gh api "repos/$env:GITHUB_REPOSITORY/releases?per_page=100" --jq '.[].tag_name'
+          if ($tags -contains "v${{ steps.aria.outputs.version }}") { throw "La release v${{ steps.aria.outputs.version }} existe déjà (publiée ou en brouillon) : augmente la version dans build.ps1." }
 
       - name: Choisir la version de Vaultwarden
         id: vw
@@ -158,6 +164,41 @@ jobs:
       - name: Compiler Aria-Vault.exe
         run: ./build.ps1 -Vaultwarden vw-dist -VaultwardenVersion ${{ steps.vw.outputs.version }} -Version ${{ steps.aria.outputs.version }}
 
+      # ------------------------------------------------------------------
+      # Signature (SignPath Foundation), seulement pour une release, et
+      # seulement une fois le projet accepté et le secret configuré. Chaque
+      # demande doit être approuvée à la main sur signpath.io.
+      # ------------------------------------------------------------------
+      - name: Préparer l'exe à signer
+        id: asigner
+        if: env.SIGNPATH_ACTIF == 'true' && inputs.release != 'aucune'
+        uses: actions/upload-artifact@v4
+        with:
+          name: a-signer
+          path: Aria-Vault.exe
+          if-no-files-found: error
+
+      - name: Signer avec SignPath
+        if: env.SIGNPATH_ACTIF == 'true' && inputs.release != 'aucune'
+        uses: signpath/github-action-submit-signing-request@v1
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: ${{ vars.SIGNPATH_PROJECT_SLUG || 'aria-vault' }}
+          signing-policy-slug: ${{ vars.SIGNPATH_POLICY_SLUG || 'release-signing' }}
+          github-artifact-id: ${{ steps.asigner.outputs.artifact-id }}
+          wait-for-completion: true
+          wait-for-completion-timeout-in-seconds: 3600 # le temps d'approuver
+          output-artifact-directory: signe
+
+      - name: Remplacer par l'exe signé
+        if: env.SIGNPATH_ACTIF == 'true' && inputs.release != 'aucune'
+        run: |
+          $sig = Get-AuthenticodeSignature signe/Aria-Vault.exe
+          Write-Host "Signature : $($sig.Status) · $($sig.SignerCertificate.Subject)"
+          if ($sig.Status -ne 'Valid') { throw "Signature invalide : $($sig.StatusMessage)" }
+          Copy-Item signe/Aria-Vault.exe Aria-Vault.exe -Force
+
       - name: Assembler
         id: dist
         run: |
@@ -198,8 +239,10 @@ jobs:
           path: dist/
           if-no-files-found: error
 
-      - name: Publier la release
-        if: inputs.publier
+      - name: Créer la release
+        if: inputs.release != 'aucune'
+        env:
+          MODE: ${{ inputs.release }}
         run: |
           $v = "${{ steps.aria.outputs.version }}"
           $notes = Get-Content .github/release-notes.md -Raw -Encoding utf8
@@ -211,4 +254,7 @@ jobs:
             "${{ steps.dist.outputs.exe }}  Aria-Vault.exe (dans le zip)`n" + '```' + "`n"
           Set-Content notes.md $notes -Encoding utf8NoBOM -NoNewline
           Get-Content notes.md
-          gh release create "v$v" (Get-ChildItem release/*.zip).FullName --title "Aria Vault $v" --notes-file notes.md --target $env:GITHUB_SHA
+          $opts = @()
+          if ($env:MODE -eq 'brouillon') { $opts += '--draft' }
+          gh release create "v$v" (Get-ChildItem release/*.zip).FullName --title "Aria Vault $v" --notes-file notes.md --target $env:GITHUB_SHA @opts
+          if ($env:MODE -eq 'brouillon') { Write-Host "Brouillon prêt : à publier depuis l'onglet Releases." }

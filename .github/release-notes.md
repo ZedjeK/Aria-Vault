@@ -3,8 +3,8 @@
 ## Installation
 
 1. Télécharge `Aria-Vault-{VERSION}.zip` ci-dessous et décompresse-le dans un dossier qui ne bougera pas (pas Téléchargements).
-2. Lance `Aria-Vault.exe`. L'exe n'est pas signé : si Windows SmartScreen affiche « Windows a protégé votre ordinateur », clique sur « Informations complémentaires » puis « Exécuter quand même ».
-3. Page **HTTPS** : ton domaine DuckDNS et son jeton. Le guide complet est dans le [README]({REPO_URL}#readme).
+2. Lance `Aria-Vault.exe`. L'exe n'est pas encore signé ([Code signing policy]({REPO_URL}/blob/main/docs/SIGNATURE.md)) : si Windows SmartScreen affiche « Windows a protégé votre ordinateur », clique sur « Informations complémentaires » puis « Exécuter quand même ».
+3. Page **HTTPS** : ton fournisseur DNS (DuckDNS, Cloudflare, OVHcloud ou deSEC), ton domaine et tes identifiants, avec le tuto pas à pas à côté. Puis réserve l'adresse IP du PC sur ta box (tuto Freebox, Livebox, Bbox, SFR dans la même page). Le guide complet est dans le [README]({REPO_URL}#readme).
 
 **Mise à jour depuis une version précédente** : lance simplement la nouvelle version, l'ancienne s'arrête proprement et lui laisse la place. Ton coffre, tes réglages et tes sauvegardes sont conservés.
 

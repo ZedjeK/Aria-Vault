@@ -1,6 +1,6 @@
 // Package tlsproxy sert le coffre en HTTPS : certificat Let's Encrypt obtenu et
-// renouvelé par certmagic (le moteur de Caddy) en validation DNS-01 chez DuckDNS,
-// puis relais vers Vaultwarden qui n'écoute que sur 127.0.0.1.
+// renouvelé par certmagic (le moteur de Caddy) en validation DNS-01 chez le
+// fournisseur DNS choisi (DuckDNS, Cloudflare, OVH, deSEC), puis relais vers Vaultwarden qui n'écoute que sur 127.0.0.1.
 //
 // Aucun port n'a besoin d'être ouvert sur la box : DNS-01 prouve le contrôle du
 // domaine par un enregistrement TXT, sans connexion entrante.
@@ -18,7 +18,6 @@ import (
 	"time"
 
 	"github.com/caddyserver/certmagic"
-	"github.com/libdns/duckdns"
 	"go.uber.org/zap"
 
 	"aria-vault/internal/ports"
@@ -26,13 +25,13 @@ import (
 
 // Options règle le relais HTTPS.
 type Options struct {
-	Domaine     string // vault.exemple.duckdns.org
-	Jeton       string // jeton DuckDNS
-	Email       string // facultatif
-	Staging     bool   // CA de test Let's Encrypt (certificat non reconnu, sans limite de fréquence)
-	Certificats string // dossier de stockage des certificats
-	Ecoute      string // ":443"
-	Cible       string // "http://127.0.0.1:8000"
+	Domaine     string                // vault.exemple.duckdns.org
+	DNS         certmagic.DNSProvider // client libdns du fournisseur, pour la preuve DNS-01
+	Email       string                // facultatif
+	Staging     bool                  // CA de test Let's Encrypt (certificat non reconnu, sans limite de fréquence)
+	Certificats string                // dossier de stockage des certificats
+	Ecoute      string                // ":443"
+	Cible       string                // "http://127.0.0.1:8000"
 	Logger      *zap.Logger
 }
 
@@ -46,8 +45,8 @@ type Proxy struct {
 }
 
 // Start ouvre le port, obtient (ou recharge) le certificat, puis sert le coffre.
-// L'obtention d'un premier certificat peut prendre quelques minutes : DuckDNS
-// doit publier l'enregistrement TXT avant que Let's Encrypt ne le vérifie.
+// L'obtention d'un premier certificat peut prendre quelques minutes : le
+// fournisseur doit publier l'enregistrement TXT avant que Let's Encrypt ne le vérifie.
 func Start(ctx context.Context, o Options) (*Proxy, error) {
 	target, err := url.Parse(o.Cible)
 	if err != nil {
@@ -86,7 +85,7 @@ func Start(ctx context.Context, o Options) (*Proxy, error) {
 		DisableTLSALPNChallenge: true,
 		DNS01Solver: &certmagic.DNS01Solver{
 			DNSManager: certmagic.DNSManager{
-				DNSProvider: &duckdns.Provider{APIToken: o.Jeton},
+				DNSProvider: o.DNS,
 			},
 		},
 		Logger: logger,

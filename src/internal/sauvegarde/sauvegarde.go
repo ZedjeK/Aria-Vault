@@ -8,6 +8,13 @@
 //
 // Une restauration ne supprime jamais rien : le coffre en place est renommé
 // en data.avant-restauration-<date> avant que la sauvegarde prenne sa place.
+// Si Aria est coupée en plein remplacement, Reparer termine le travail au
+// lancement suivant.
+//
+// En option, la sauvegarde est chiffrée par une phrase de passe (paquet
+// chiffre) : aria-vault-<date>.zip.chiffre. Le zip en clair n'existe alors
+// que le temps de la copie, à côté du coffre, jamais dans le dossier des
+// sauvegardes (qui peut être synchronisé par OneDrive).
 package sauvegarde
 
 import (
@@ -22,12 +29,15 @@ import (
 	"sort"
 	"strings"
 	"time"
+
+	"aria-vault/internal/chiffre"
 )
 
 const (
-	Prefixe   = "aria-vault-"
-	Extension = ".zip"
-	Garder    = 10 // sauvegardes conservées par la rotation
+	Prefixe           = "aria-vault-"
+	Extension         = ".zip"
+	ExtensionChiffree = ".zip.chiffre"
+	Garder            = 10 // sauvegardes conservées par la rotation
 
 	formatDate = "2006-01-02_150405"
 	manifeste  = "aria-vault.json"
@@ -41,13 +51,19 @@ var (
 	dossiers = []string{"attachments", "sends"}
 )
 
+var magieChiffree = []byte("ARIABAK1")
+
 // Info décrit une sauvegarde.
 type Info struct {
-	Nom    string    `json:"nom"`
-	Chemin string    `json:"chemin"`
-	Date   time.Time `json:"date"`
-	Taille int64     `json:"taille"`
+	Nom      string    `json:"nom"`
+	Chemin   string    `json:"chemin"`
+	Date     time.Time `json:"date"`
+	Taille   int64     `json:"taille"`
+	Chiffree bool      `json:"chiffree"`
 }
+
+// EstChiffree indique si le nom désigne une sauvegarde chiffrée.
+func EstChiffree(nom string) bool { return strings.HasSuffix(nom, ExtensionChiffree) }
 
 type manifest struct {
 	Format   string    `json:"format"`
@@ -59,11 +75,17 @@ type manifest struct {
 // ErrPasDeCoffre signale un dossier sans base Vaultwarden.
 var ErrPasDeCoffre = errors.New("aucun coffre ici : db.sqlite3 introuvable")
 
-// Creer sauvegarde le dossier donnees dans dest. Vaultwarden doit être arrêté
-// pour que la base soit copiée dans un état cohérent.
-func Creer(donnees, dest string, now time.Time) (Info, error) {
+// Creer sauvegarde le dossier donnees dans dest, chiffrée par phrase si elle
+// n'est pas vide. Vaultwarden doit être arrêté pour que la base soit copiée
+// dans un état cohérent.
+func Creer(donnees, dest string, now time.Time, phrase string) (Info, error) {
 	if _, err := os.Stat(filepath.Join(donnees, base)); err != nil {
 		return Info{}, ErrPasDeCoffre
+	}
+	if phrase != "" {
+		if err := chiffre.VerifierPhrase(phrase); err != nil {
+			return Info{}, err
+		}
 	}
 	elements, err := aSauvegarder(donnees)
 	if err != nil {
@@ -73,17 +95,38 @@ func Creer(donnees, dest string, now time.Time) (Info, error) {
 		return Info{}, err
 	}
 
-	nom := Prefixe + now.Format(formatDate) + Extension
+	ext := Extension
+	if phrase != "" {
+		ext = ExtensionChiffree
+	}
+	nom := Prefixe + now.Format(formatDate) + ext
 	final := filepath.Join(dest, nom)
 	tmp := final + ".tmp"
-	if err := ecrireZip(tmp, donnees, elements, now); err != nil {
-		os.Remove(tmp)
+	zipClair := tmp
+	if phrase != "" {
+		// Le zip en clair reste à côté du coffre, hors du dossier des sauvegardes.
+		zipClair = filepath.Join(filepath.Dir(donnees), "sauvegarde-en-cours.zip")
+		defer os.Remove(zipClair)
+	}
+	if err := ecrireZip(zipClair, donnees, elements, now); err != nil {
+		os.Remove(zipClair)
 		return Info{}, err
 	}
 	// Relue intégralement (CRC de chaque fichier) avant d'être considérée valide.
-	if err := Verifier(tmp); err != nil {
-		os.Remove(tmp)
+	if err := Verifier(zipClair, ""); err != nil {
+		os.Remove(zipClair)
 		return Info{}, fmt.Errorf("sauvegarde illisible après écriture : %w", err)
+	}
+	if phrase != "" {
+		if err := chiffrerFichier(zipClair, tmp, phrase); err != nil {
+			os.Remove(tmp)
+			return Info{}, fmt.Errorf("chiffrement de la sauvegarde : %w", err)
+		}
+		// Déchiffrée entièrement une fois : chaque bloc est authentifié.
+		if err := dechiffrerFichier(tmp, io.Discard, phrase); err != nil {
+			os.Remove(tmp)
+			return Info{}, fmt.Errorf("sauvegarde chiffrée illisible après écriture : %w", err)
+		}
 	}
 	if err := os.Rename(tmp, final); err != nil {
 		os.Remove(tmp)
@@ -93,7 +136,62 @@ func Creer(donnees, dest string, now time.Time) (Info, error) {
 	if err != nil {
 		return Info{}, err
 	}
-	return Info{Nom: nom, Chemin: final, Date: now, Taille: st.Size()}, nil
+	return Info{Nom: nom, Chemin: final, Date: now, Taille: st.Size(), Chiffree: phrase != ""}, nil
+}
+
+func chiffrerFichier(src, dst, phrase string) error {
+	in, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer in.Close()
+	out, err := os.OpenFile(dst, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o600)
+	if err != nil {
+		return err
+	}
+	if err := chiffre.Chiffrer(out, in, phrase, magieChiffree); err != nil {
+		out.Close()
+		return err
+	}
+	if err := out.Sync(); err != nil {
+		out.Close()
+		return err
+	}
+	return out.Close()
+}
+
+func dechiffrerFichier(src string, dst io.Writer, phrase string) error {
+	in, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer in.Close()
+	err = chiffre.Dechiffrer(dst, in, phrase, magieChiffree)
+	if errors.Is(err, chiffre.ErrFormat) {
+		return errors.New("ce n'est pas une sauvegarde chiffrée d'Aria Vault")
+	}
+	return err
+}
+
+// ErrPhrase signale une phrase incorrecte pour une sauvegarde chiffrée.
+var ErrPhrase = chiffre.ErrPhrase
+
+// dechiffrerVers déchiffre une sauvegarde dans un zip temporaire du dossier dir.
+func dechiffrerVers(archive, dir, phrase string) (string, error) {
+	out, err := os.CreateTemp(dir, "aria-restauration-*.zip")
+	if err != nil {
+		return "", err
+	}
+	tmp := out.Name()
+	err = dechiffrerFichier(archive, out, phrase)
+	if cerr := out.Close(); err == nil {
+		err = cerr
+	}
+	if err != nil {
+		os.Remove(tmp)
+		return "", err
+	}
+	return tmp, nil
 }
 
 // aSauvegarder liste les fichiers à copier (chemins relatifs, séparateur /).
@@ -197,7 +295,16 @@ func ajouter(zw *zip.Writer, donnees, rel string) error {
 }
 
 // Verifier relit toute l'archive : chemins sûrs, base présente, CRC corrects.
-func Verifier(chemin string) error {
+// Une sauvegarde chiffrée est d'abord déchiffrée avec phrase.
+func Verifier(chemin, phrase string) error {
+	if EstChiffree(chemin) {
+		tmp, err := dechiffrerVers(chemin, os.TempDir(), phrase)
+		if err != nil {
+			return err
+		}
+		defer os.Remove(tmp)
+		chemin = tmp
+	}
 	zr, err := zip.OpenReader(chemin)
 	if err != nil {
 		return fmt.Errorf("archive illisible : %w", err)
@@ -253,18 +360,25 @@ func Lister(dest string) ([]Info, error) {
 		if err != nil {
 			continue
 		}
-		out = append(out, Info{Nom: e.Name(), Chemin: filepath.Join(dest, e.Name()), Date: date, Taille: st.Size()})
+		out = append(out, Info{Nom: e.Name(), Chemin: filepath.Join(dest, e.Name()), Date: date, Taille: st.Size(), Chiffree: EstChiffree(e.Name())})
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].Date.After(out[j].Date) })
 	return out, nil
 }
 
-// DateDe lit la date dans le nom d'une sauvegarde (aria-vault-2026-10-12_213000.zip).
+// DateDe lit la date dans le nom d'une sauvegarde (aria-vault-2026-10-12_213000.zip
+// ou .zip.chiffre).
 func DateDe(nom string) (time.Time, bool) {
-	if !strings.HasPrefix(nom, Prefixe) || !strings.HasSuffix(nom, Extension) || filepath.Base(nom) != nom {
+	if !strings.HasPrefix(nom, Prefixe) || filepath.Base(nom) != nom {
 		return time.Time{}, false
 	}
-	t, err := time.ParseInLocation(formatDate, strings.TrimSuffix(strings.TrimPrefix(nom, Prefixe), Extension), time.Local)
+	ext := Extension
+	if EstChiffree(nom) {
+		ext = ExtensionChiffree
+	} else if !strings.HasSuffix(nom, Extension) {
+		return time.Time{}, false
+	}
+	t, err := time.ParseInLocation(formatDate, strings.TrimSuffix(strings.TrimPrefix(nom, Prefixe), ext), time.Local)
 	return t, err == nil
 }
 
@@ -285,11 +399,22 @@ func Purger(dest string, garder int) ([]string, error) {
 	return supprimees, nil
 }
 
-// Restaurer remplace le coffre par le contenu de l'archive. Vaultwarden doit
-// être arrêté. Renvoie le dossier où l'ancien coffre a été mis de côté ("" s'il
-// n'y en avait pas).
-func Restaurer(archive, donnees string, now time.Time) (string, error) {
-	if err := Verifier(archive); err != nil {
+// Restaurer remplace le coffre par le contenu de l'archive (déchiffrée avec
+// phrase si besoin). Vaultwarden doit être arrêté. Renvoie le dossier où
+// l'ancien coffre a été mis de côté ("" s'il n'y en avait pas).
+func Restaurer(archive, donnees string, now time.Time, phrase string) (string, error) {
+	if EstChiffree(archive) {
+		if err := os.MkdirAll(filepath.Dir(donnees), 0o700); err != nil {
+			return "", err
+		}
+		clair, err := dechiffrerVers(archive, filepath.Dir(donnees), phrase)
+		if err != nil {
+			return "", err
+		}
+		defer os.Remove(clair)
+		archive = clair
+	}
+	if err := Verifier(archive, ""); err != nil {
 		return "", err
 	}
 	tmp := donnees + ".restauration"
@@ -355,6 +480,47 @@ func remplacer(tmp, donnees string, now time.Time) (string, error) {
 		return "", err
 	}
 	return ancien, nil
+}
+
+// Reparer termine ou annule un remplacement du coffre interrompu (coupure de
+// courant, plantage) entre la mise de côté de l'ancien coffre et l'installation
+// du nouveau. À appeler au lancement, avant Vaultwarden. Rien n'est supprimé.
+// Le message décrit la réparation faite ("" s'il n'y avait rien à faire).
+func Reparer(donnees string) (string, error) {
+	if _, err := os.Lstat(donnees); err == nil {
+		return "", nil // coffre en place
+	} else if !errors.Is(err, fs.ErrNotExist) {
+		return "", err
+	}
+	// 1. Le nouveau coffre était prêt (extraction ou copie terminée) : on l'installe.
+	tmp := donnees + ".restauration"
+	if _, err := os.Stat(filepath.Join(tmp, base)); err == nil {
+		if err := os.Rename(tmp, donnees); err != nil {
+			return "", fmt.Errorf("restauration interrompue, reprise impossible : %w", err)
+		}
+		return "Restauration interrompue lors du dernier lancement : terminée", nil
+	}
+	// 2. Sinon, l'ancien coffre mis de côté le plus récent reprend sa place.
+	ancien := ""
+	entrees, _ := filepath.Glob(donnees + ".avant-restauration-*")
+	for _, e := range entrees {
+		if st, err := os.Stat(filepath.Join(e, base)); err == nil && st.Mode().IsRegular() && e > ancien {
+			ancien = e // le format de date se trie comme du texte
+		}
+	}
+	if ancien == "" || !existe(tmp) {
+		// Pas de remplacement en cours : premier lancement, ou dossier retiré à la main.
+		return "", nil
+	}
+	if err := os.Rename(ancien, donnees); err != nil {
+		return "", fmt.Errorf("restauration interrompue, retour à l'ancien coffre impossible : %w", err)
+	}
+	return fmt.Sprintf("Restauration interrompue lors du dernier lancement : coffre précédent remis en place (%s)", filepath.Base(ancien)), nil
+}
+
+func existe(p string) bool {
+	_, err := os.Lstat(p)
+	return err == nil
 }
 
 func extraire(archive, dst string) error {

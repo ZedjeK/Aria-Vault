@@ -12,7 +12,17 @@ export const app = $state({
   error: '', // erreur de la dernière action
   journal: [],
   backups: null, // page Sauvegardes
+  fournisseurs: [], // fournisseurs DNS et leurs tutoriels
 })
+
+export async function loadFournisseurs() {
+  if (app.fournisseurs.length) return
+  try {
+    app.fournisseurs = (await call('Fournisseurs')) ?? []
+  } catch (err) {
+    app.error = message(err)
+  }
+}
 
 export async function refresh() {
   try {
@@ -61,6 +71,21 @@ export const setInscriptions = (on) => run(() => call('SetInscriptions', on))
 export const setAutostart = (on) => run(() => call('SetAutostart', on))
 export const openVault = () => run(() => call('OpenVault'))
 export const openData = () => run(() => call('OpenDataFolder'))
+export const setIPAuto = (on) => run(() => call('SetIPAuto', on))
+export const checkIP = () => run(() => call('CheckIP'))
+export const setVerifMaj = (on) => run(() => call('SetVerifMaj', on))
+export const checkUpdate = () => run(() => call('CheckUpdate'))
+export const openRelease = () => run(() => call('OpenRelease'))
+export const setEmpecherVeille = (on) => run(() => call('SetEmpecherVeille', on))
+
+// Les liens des tutoriels s'ouvrent dans le navigateur, sans bloquer l'interface.
+export async function openLink(url) {
+  try {
+    await call('OpenLink', url)
+  } catch (err) {
+    app.error = message(err)
+  }
+}
 
 export async function saveConfig(input) {
   const res = await run(() => call('SaveConfig', input))
@@ -109,7 +134,12 @@ async function runBackup(fn) {
 }
 
 export const backupNow = () => runBackup(() => call('Backup'))
-export const restoreBackup = (nom) => runBackup(() => call('Restore', nom))
+export async function restoreBackup(nom, phrase = '') {
+  const res = await runBackup(() => call('Restore', nom, phrase))
+  if (res?.error) app.error = res.error
+  return res ?? { error: app.error }
+}
+export const setBackupEncryption = (on, phrase = '') => runBackup(() => call('SetBackupEncryption', on, phrase))
 export const importVault = () => runBackup(() => call('ImportVault'))
 export const chooseBackupFolder = () => runBackup(() => call('ChooseBackupFolder'))
 export const openBackupFolder = () => run(() => call('OpenBackupFolder'))
@@ -120,6 +150,11 @@ export async function importSettings(phrase) {
   const res = await run(() => call('ImportSettings', phrase))
   if (res?.error) app.error = res.error
   return res
+}
+
+export function formatHeure(iso) {
+  if (!valid(iso)) return ''
+  return new Date(iso).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
 }
 
 export function formatDateHeure(iso) {

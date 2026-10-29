@@ -2,9 +2,11 @@ package sauvegarde
 
 import (
 	"archive/zip"
+	"errors"
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 )
@@ -54,7 +56,7 @@ func TestCreerNeGardeQueLEssentiel(t *testing.T) {
 	dest := filepath.Join(t.TempDir(), "Sauvegardes")
 	now := time.Date(2026, 10, 12, 21, 30, 0, 0, time.Local)
 
-	info, err := Creer(data, dest, now)
+	info, err := Creer(data, dest, now, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -71,7 +73,7 @@ func TestCreerNeGardeQueLEssentiel(t *testing.T) {
 }
 
 func TestCreerSansCoffre(t *testing.T) {
-	if _, err := Creer(t.TempDir(), t.TempDir(), time.Now()); err != ErrPasDeCoffre {
+	if _, err := Creer(t.TempDir(), t.TempDir(), time.Now(), ""); err != ErrPasDeCoffre {
 		t.Errorf("err = %v", err)
 	}
 }
@@ -82,7 +84,7 @@ func TestListerEtPurger(t *testing.T) {
 	dest := t.TempDir()
 	debut := time.Date(2026, 10, 1, 3, 0, 0, 0, time.Local)
 	for i := 0; i < 12; i++ {
-		if _, err := Creer(data, dest, debut.Add(time.Duration(i)*24*time.Hour)); err != nil {
+		if _, err := Creer(data, dest, debut.Add(time.Duration(i)*24*time.Hour), ""); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -110,7 +112,7 @@ func TestRestaurerMetLAncienDeCote(t *testing.T) {
 	data := filepath.Join(racine, "data")
 	fauxCoffre(t, data, "ANCIEN")
 	dest := filepath.Join(racine, "svg")
-	info, err := Creer(data, dest, time.Date(2026, 10, 12, 9, 0, 0, 0, time.Local))
+	info, err := Creer(data, dest, time.Date(2026, 10, 12, 9, 0, 0, 0, time.Local), "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -121,7 +123,7 @@ func TestRestaurerMetLAncienDeCote(t *testing.T) {
 
 	// …puis on restaure.
 	now := time.Date(2026, 10, 12, 10, 0, 0, 0, time.Local)
-	ancien, err := Restaurer(info.Chemin, data, now)
+	ancien, err := Restaurer(info.Chemin, data, now, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -156,14 +158,14 @@ func TestVerifierRefuse(t *testing.T) {
 		f.Close()
 		return p
 	}
-	if err := Verifier(creerZip("sansbase.zip", "rsa_key.pem")); err == nil {
+	if err := Verifier(creerZip("sansbase.zip", "rsa_key.pem"), ""); err == nil {
 		t.Error("archive sans db.sqlite3 acceptée")
 	}
-	if err := Verifier(creerZip("evasion.zip", "db.sqlite3", "../../evasion.txt")); err == nil {
+	if err := Verifier(creerZip("evasion.zip", "db.sqlite3", "../../evasion.txt"), ""); err == nil {
 		t.Error("chemin d'évasion accepté")
 	}
 	os.WriteFile(filepath.Join(dir, "pasunzip.zip"), []byte("bonjour"), 0o600)
-	if err := Verifier(filepath.Join(dir, "pasunzip.zip")); err == nil {
+	if err := Verifier(filepath.Join(dir, "pasunzip.zip"), ""); err == nil {
 		t.Error("fichier non zip accepté")
 	}
 }
@@ -193,5 +195,116 @@ func TestImporter(t *testing.T) {
 	}
 	if _, err := Importer(t.TempDir(), data, time.Now()); err != ErrPasDeCoffre {
 		t.Errorf("dossier vide : %v", err)
+	}
+}
+
+func TestSauvegardeChiffree(t *testing.T) {
+	racine := t.TempDir()
+	data := filepath.Join(racine, "data")
+	fauxCoffre(t, data, "SECRET")
+	dest := filepath.Join(racine, "svg")
+	const phrase = "phrase des sauvegardes"
+
+	if _, err := Creer(data, dest, time.Now(), "court"); err == nil {
+		t.Error("phrase trop courte acceptée")
+	}
+	info, err := Creer(data, dest, time.Date(2026, 10, 29, 9, 0, 0, 0, time.Local), phrase)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !info.Chiffree || info.Nom != "aria-vault-2026-10-29_090000.zip.chiffre" {
+		t.Fatalf("info = %+v", info)
+	}
+	brut, _ := os.ReadFile(info.Chemin)
+	for _, clair := range []string{"base SECRET", "cle SECRET", "db.sqlite3", "PK\x03\x04"} {
+		if strings.Contains(string(brut), clair) {
+			t.Errorf("%q lisible dans la sauvegarde chiffrée", clair)
+		}
+	}
+	// Aucun zip en clair ne traîne, ni dans le dossier des sauvegardes ni à côté du coffre.
+	for _, dir := range []string{dest, racine} {
+		entrees, _ := os.ReadDir(dir)
+		for _, e := range entrees {
+			if strings.HasSuffix(e.Name(), ".zip") || strings.HasSuffix(e.Name(), ".tmp") {
+				t.Errorf("fichier temporaire restant : %s", e.Name())
+			}
+		}
+	}
+
+	liste, _ := Lister(dest)
+	if len(liste) != 1 || !liste[0].Chiffree {
+		t.Fatalf("liste = %+v", liste)
+	}
+	if err := Verifier(info.Chemin, phrase); err != nil {
+		t.Fatal(err)
+	}
+	if err := Verifier(info.Chemin, "mauvaise phrase"); !errors.Is(err, ErrPhrase) {
+		t.Errorf("mauvaise phrase : %v", err)
+	}
+
+	os.RemoveAll(data)
+	fauxCoffre(t, data, "NOUVEAU")
+	if _, err := Restaurer(info.Chemin, data, time.Now(), "mauvaise phrase"); !errors.Is(err, ErrPhrase) {
+		t.Fatalf("restauration avec une mauvaise phrase : %v", err)
+	}
+	if b, _ := os.ReadFile(filepath.Join(data, "db.sqlite3")); string(b) != "base NOUVEAU" {
+		t.Fatal("le coffre a été touché malgré la mauvaise phrase")
+	}
+	if _, err := Restaurer(info.Chemin, data, time.Now(), phrase); err != nil {
+		t.Fatal(err)
+	}
+	if b, _ := os.ReadFile(filepath.Join(data, "db.sqlite3")); string(b) != "base SECRET" {
+		t.Errorf("base restaurée = %q", b)
+	}
+	// La rotation compte les deux formats ensemble.
+	if _, err := Creer(data, dest, time.Date(2026, 10, 30, 9, 0, 0, 0, time.Local), ""); err != nil {
+		t.Fatal(err)
+	}
+	if suppr, _ := Purger(dest, 1); len(suppr) != 1 || suppr[0] != info.Nom {
+		t.Errorf("rotation : %v", suppr)
+	}
+}
+
+func TestReparer(t *testing.T) {
+	// Coupure après la mise de côté de l'ancien coffre : le nouveau, prêt, est installé.
+	racine := t.TempDir()
+	data := filepath.Join(racine, "data")
+	fauxCoffre(t, data+".restauration", "NOUVEAU")
+	fauxCoffre(t, data+".avant-restauration-2026-10-29_100000", "ANCIEN")
+	msg, err := Reparer(data)
+	if err != nil || msg == "" {
+		t.Fatalf("%q %v", msg, err)
+	}
+	if b, _ := os.ReadFile(filepath.Join(data, "db.sqlite3")); string(b) != "base NOUVEAU" {
+		t.Errorf("base = %q", b)
+	}
+	if _, err := os.Stat(data + ".avant-restauration-2026-10-29_100000"); err != nil {
+		t.Error("l'ancien coffre doit rester de côté")
+	}
+
+	// Nouveau coffre incomplet : l'ancien le plus récent reprend sa place.
+	racine = t.TempDir()
+	data = filepath.Join(racine, "data")
+	os.MkdirAll(data+".restauration", 0o700)
+	fauxCoffre(t, data+".avant-restauration-2026-10-01_100000", "VIEUX")
+	fauxCoffre(t, data+".avant-restauration-2026-10-29_100000", "ANCIEN")
+	if msg, err := Reparer(data); err != nil || msg == "" {
+		t.Fatalf("%q %v", msg, err)
+	}
+	if b, _ := os.ReadFile(filepath.Join(data, "db.sqlite3")); string(b) != "base ANCIEN" {
+		t.Errorf("base = %q", b)
+	}
+
+	// Coffre en place, ou rien en cours : on ne touche à rien.
+	if msg, err := Reparer(data); err != nil || msg != "" {
+		t.Errorf("coffre en place : %q %v", msg, err)
+	}
+	racine = t.TempDir()
+	fauxCoffre(t, filepath.Join(racine, "data.avant-restauration-2026-10-01_100000"), "VIEUX")
+	if msg, err := Reparer(filepath.Join(racine, "data")); err != nil || msg != "" {
+		t.Errorf("sans remplacement en cours : %q %v", msg, err)
+	}
+	if _, err := os.Stat(filepath.Join(racine, "data")); err == nil {
+		t.Error("un ancien coffre a été remis en place sans remplacement en cours")
 	}
 }
