@@ -246,6 +246,12 @@ jobs:
         run: |
           $v = "${{ steps.aria.outputs.version }}"
           $notes = Get-Content .github/release-notes.md -Raw -Encoding utf8
+          # Nouveautés de cette version, si elles ont été rédigées (.github/nouveautes/<version>.md)
+          $nouv = ".github/nouveautes/$v.md"
+          if (Test-Path $nouv) {
+            $i = $notes.IndexOf('## Installation')
+            $notes = $notes.Insert($i, (Get-Content $nouv -Raw -Encoding utf8))
+          }
           $notes = $notes.Replace('{VERSION}', $v).Replace('{VW_VERSION}', '${{ steps.vw.outputs.version }}')
           $notes = $notes.Replace('{VW_COMMIT}', '${{ steps.vault.outputs.commit }}').Replace('{WEBVAULT}', '${{ steps.vault.outputs.version }}')
           $notes = $notes.Replace('{REPO_URL}', "$env:GITHUB_SERVER_URL/$env:GITHUB_REPOSITORY").Replace('{OWNER}', "$env:GITHUB_REPOSITORY_OWNER")
