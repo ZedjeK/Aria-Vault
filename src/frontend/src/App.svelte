@@ -104,7 +104,7 @@
 <div class="shell" class:replie>
   <nav class="sidebar" aria-label="Sections">
     <div class="brand">
-      <Logo size={56} dim={etat !== 'actif'} />
+      <Logo size={48} dim={etat !== 'actif'} />
       <span class="brand-name label"><span class="brand-top">ARIA</span><span class="brand-sub">VAULT</span></span>
     </div>
 
