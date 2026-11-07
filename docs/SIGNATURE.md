@@ -59,8 +59,8 @@ confidentialité de ces services s'appliquent à leurs connexions :
 
 Aria Vault ne s'installe pas : quitte-le (clic droit sur l'icône → Quitter), désactive « Lancer
 à l'ouverture de session » au préalable si tu l'avais activé, puis supprime l'exe. Tes données
-restent dans `%USERPROFILE%\.Aria-Vault` (et le cache dans `%LOCALAPPDATA%\AriaVault`) tant que tu ne
-supprimes pas ces dossiers toi-même.
+et le cache restent dans `%USERPROFILE%\.Aria-Vault` tant que tu ne supprimes pas ce dossier
+toi-même.
 
 ---
 

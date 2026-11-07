@@ -15,6 +15,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 
 	"github.com/wailsapp/wails/v3/pkg/application"
 	"github.com/wailsapp/wails/v3/pkg/events"
@@ -64,17 +65,28 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	// 1. Une version plus ancienne encore lancée laisse la place (avant tout
-	//    accès au dossier, qu'elle peut encore tenir ouvert).
-	releves := releve.Reprendre(filepath.Join(racine, paths.Dossier), version)
-	// 2. Ancien dossier AriaVaultwarden renommé en AriaVault si besoin (cache).
-	cache, migration, errMigration := paths.Migrer(racine)
-	// 3. Données d'une version précédente déplacées vers %USERPROFILE%\.Aria-Vault.
 	profil, errProfil := paths.Profil()
 	if errProfil != nil {
 		profil = ""
 	}
+	// 1. Une version plus ancienne encore lancée laisse la place (avant tout
+	//    accès au dossier, qu'elle peut encore tenir ouvert). Elle se décrit
+	//    dans .Aria-Vault\cache, ou dans %LOCALAPPDATA%\AriaVault jusqu'à la v0.8.
+	bases := []string{filepath.Join(racine, paths.Dossier)}
+	if profil != "" {
+		bases = append(bases, filepath.Join(profil, paths.DossierDonnees, paths.SousCache))
+	}
+	releves := releve.Reprendre(version, bases...)
+	// 2. Ancien dossier AriaVaultwarden renommé en AriaVault si besoin.
+	cache, migration, errMigration := paths.Migrer(racine)
+	// 3. Données d'une version précédente déplacées vers %USERPROFILE%\.Aria-Vault.
 	p, deplacement, errDeplacement := paths.Deplacer(profil, cache)
+	// 4. Le cache vit désormais dans .Aria-Vault\cache : l'ancien, dans
+	//    %LOCALAPPDATA%, est effacé (seulement ce qui se recrée tout seul).
+	var nettoyes []string
+	if p.Cache != cache.Base {
+		nettoyes = paths.NettoyerAncienCache(cache.Base)
+	}
 	for _, d := range []string{p.Base, p.Cache} {
 		if err := os.MkdirAll(d, 0o700); err != nil {
 			log.Fatal(err)
@@ -101,7 +113,10 @@ func main() {
 	if errDeplacement != nil {
 		j.Add(journal.Erreur, "%v", errDeplacement)
 	}
-	// 4. Une restauration coupée en plein milieu (panne, plantage) est terminée.
+	if len(nettoyes) > 0 {
+		j.Add(journal.OK, "Cache déplacé dans %s ; ancien cache effacé de %s (%s)", p.Cache, cache.Base, strings.Join(nettoyes, ", "))
+	}
+	// 5. Une restauration coupée en plein milieu (panne, plantage) est terminée.
 	if msg, err := sauvegarde.Reparer(p.Donnees); err != nil {
 		j.Add(journal.Erreur, "%v", err)
 	} else if msg != "" {

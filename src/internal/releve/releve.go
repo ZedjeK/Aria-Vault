@@ -25,7 +25,8 @@ import (
 )
 
 const (
-	// fichier décrit l'instance en cours (dans le cache, %LOCALAPPDATA%\AriaVault).
+	// fichier décrit l'instance en cours (dans le cache : .Aria-Vault\cache depuis
+	// la v0.9, %LOCALAPPDATA%\AriaVault avant).
 	fichier       = "instance.json"
 	attentePropre = 20 * time.Second // le serveur peut mettre quelques secondes à s'arrêter
 	// attenteForce : délai supplémentaire après l'arrêt forcé d'une instance qui
@@ -85,7 +86,7 @@ func lire(base string) (Instance, error) {
 // Reprendre ferme une version plus ancienne d'Aria encore lancée pour lui
 // succéder. À appeler avant application.New. Renvoie les messages à
 // recopier dans le journal (le journal n'existe pas encore à ce stade).
-func Reprendre(base, version string) []string {
+func Reprendre(version string, bases ...string) []string {
 	var msgs []string
 
 	// Versions 0.3 : pas de fermeture propre possible, arrêt direct.
@@ -97,23 +98,33 @@ func Reprendre(base, version string) []string {
 		msgs = append(msgs, fmt.Sprintf("Ancienne version %s (PID %d) fermée pour laisser la place", a.nom, a.pid))
 	}
 
-	// Versions 0.4 et suivantes : instance.json et signal de fermeture.
+	// Versions 0.4 et suivantes : instance.json et signal de fermeture. Chaque
+	// emplacement connu du cache est lu, l'actuel comme celui des anciennes
+	// versions (une v0.8 se décrit encore dans %LOCALAPPDATA%\AriaVault).
+	for _, base := range bases {
+		msgs = append(msgs, reprendreDepuis(base, version)...)
+	}
+	return msgs
+}
+
+// reprendreDepuis ferme l'instance décrite dans base si elle est plus ancienne.
+func reprendreDepuis(base, version string) []string {
 	inst, err := lire(base)
 	if err != nil || inst.PID == uint32(os.Getpid()) || !PlusRecente(version, inst.Version) {
-		return msgs
+		return nil
 	}
 	if !vivante(inst.PID, inst.Creation) {
-		return msgs // instance.json périmé (plantage, redémarrage)
+		return nil // instance.json périmé (plantage, redémarrage)
 	}
 	if err := demanderFermeture(); err == nil {
 		if attendre(inst.PID, attentePropre) {
-			return append(msgs, fmt.Sprintf("Version %s fermée proprement : la %s prend le relais", inst.Version, version))
+			return []string{fmt.Sprintf("Version %s fermée proprement : la %s prend le relais", inst.Version, version)}
 		}
 	}
 	if err := terminer(inst.PID, attenteForce); err != nil {
-		return append(msgs, fmt.Sprintf("Version %s (PID %d) impossible à fermer : %v", inst.Version, inst.PID, err))
+		return []string{fmt.Sprintf("Version %s (PID %d) impossible à fermer : %v", inst.Version, inst.PID, err)}
 	}
-	return append(msgs, fmt.Sprintf("Version %s ne répondait pas : arrêtée pour laisser la place à la %s", inst.Version, version))
+	return []string{fmt.Sprintf("Version %s ne répondait pas : arrêtée pour laisser la place à la %s", inst.Version, version)}
 }
 
 // PlusRecente indique si la version a est strictement plus récente que b

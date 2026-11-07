@@ -109,7 +109,7 @@ func TestDeplacer(t *testing.T) {
 		t.Fatalf("%v %q", err, msg)
 	}
 	nouveau := filepath.Join(profil, DossierDonnees)
-	if p.Base != nouveau || p.Cache != cache.Base || p.Moteur != filepath.Join(cache.Base, "moteur") {
+	if p.Base != nouveau || p.Cache != filepath.Join(nouveau, SousCache) || p.Moteur != filepath.Join(nouveau, SousCache, "moteur") {
 		t.Fatalf("%+v", p)
 	}
 	if b, _ := os.ReadFile(filepath.Join(p.Donnees, "db.sqlite3")); string(b) != "coffre" {
@@ -120,7 +120,8 @@ func TestDeplacer(t *testing.T) {
 			t.Errorf("%s non déplacé", e)
 		}
 	}
-	// Le cache garde ce qui se recrée tout seul, et la relève.
+	// L'ancien cache garde ce qui se recrée tout seul, et la relève, jusqu'au
+	// nettoyage (NettoyerAncienCache, une fois l'ancienne version fermée).
 	for _, e := range []string{"moteur/vaultwarden.exe", "instance.json"} {
 		if !existe(filepath.Join(cache.Base, filepath.FromSlash(e))) {
 			t.Errorf("%s ne doit pas bouger", e)
@@ -176,5 +177,30 @@ func TestDeplacerRefuseOneDrive(t *testing.T) {
 	cache := In(filepath.Join(racine, "Local", Dossier))
 	if p, _, err := Deplacer(profil, cache); err == nil || p != cache {
 		t.Errorf("profil OneDrive accepté : %+v", p)
+	}
+}
+
+func TestNettoyerAncienCache(t *testing.T) {
+	ancien := filepath.Join(t.TempDir(), Dossier)
+	fichier(t, filepath.Join(ancien, "moteur", "vaultwarden.exe"), "exe")
+	fichier(t, filepath.Join(ancien, "webview", "EBWebView", "x"), "x")
+	fichier(t, filepath.Join(ancien, "instance.json"), "{}")
+
+	if eff := NettoyerAncienCache(ancien); len(eff) != 3 {
+		t.Errorf("effacés : %v", eff)
+	}
+	if existe(ancien) {
+		t.Error("l'ancien cache vide doit disparaître")
+	}
+
+	// Une donnée restée sur place (déplacement impossible) n'est jamais effacée.
+	fichier(t, filepath.Join(ancien, "moteur", "vaultwarden.exe"), "exe")
+	fichier(t, filepath.Join(ancien, "data", "db.sqlite3"), "coffre")
+	NettoyerAncienCache(ancien)
+	if b, _ := os.ReadFile(filepath.Join(ancien, "data", "db.sqlite3")); string(b) != "coffre" {
+		t.Error("le coffre ne doit jamais être touché")
+	}
+	if existe(filepath.Join(ancien, "moteur")) {
+		t.Error("moteur aurait dû être effacé")
 	}
 }

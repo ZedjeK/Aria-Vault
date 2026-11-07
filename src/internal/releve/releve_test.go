@@ -38,7 +38,7 @@ func TestEnregistrerLireEffacer(t *testing.T) {
 		t.Fatalf("instance relue = %+v, %v", inst, err)
 	}
 	// Une instance qui se décrit elle-même n'est jamais fermée par Reprendre.
-	if msgs := Reprendre(base, "9.9.9"); len(msgs) != 0 {
+	if msgs := Reprendre("9.9.9", base); len(msgs) != 0 {
 		t.Errorf("Reprendre sur soi-même : %v", msgs)
 	}
 	Effacer(base)
@@ -55,7 +55,7 @@ func TestEffacerNeTouchePasAUneAutreInstance(t *testing.T) {
 		t.Error("instance.json d'une autre instance supprimé")
 	}
 	// Instance périmée (PID inexistant) : aucune action.
-	if msgs := Reprendre(base, "0.5.0"); len(msgs) != 0 {
+	if msgs := Reprendre("0.5.0", base); len(msgs) != 0 {
 		t.Errorf("instance périmée : %v", msgs)
 	}
 }

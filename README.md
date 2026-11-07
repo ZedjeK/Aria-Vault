@@ -235,11 +235,12 @@ Ce qui compte est dans **`%USERPROFILE%\.Aria-Vault`** (chez toi, `C:\Users\<toi
 | `config.json` | Réglages d'Aria. Identifiants DNS, clé push, mot de passe e-mail et phrase des sauvegardes y sont chiffrés avec DPAPI, liés à ton compte Windows |
 | `aria.log` | Journal (aussi visible dans la page Journal) |
 | `fenetre.json` | Taille et position de la fenêtre |
+| `cache\` | Ce qui se recrée tout seul : Vaultwarden et l'interface web (réextraits et vérifiés à chaque démarrage), le cache de la fenêtre, le fichier de relève, les mises à jour téléchargées |
 
-Ce qui se recrée tout seul reste dans `%LOCALAPPDATA%\AriaVault` : Vaultwarden et l'interface web (réextraits et vérifiés à chaque démarrage), le cache de la fenêtre, le fichier de relève.
+Depuis la v0.9, le cache est lui aussi dans `.Aria-Vault`, comme pour les autres applis Aria : l'ancien `%LOCALAPPDATA%\AriaVault` est effacé au premier lancement (seulement ce qui se recrée tout seul ; une donnée qui n'aurait pas pu être déplacée n'y est jamais touchée).
 
 - Ne copie pas `.Aria-Vault` à la main pendant que le serveur tourne : passe par la page Sauvegardes, qui met le serveur en pause.
-- Ne le place pas dans OneDrive : une base synchronisée pendant qu'elle tourne se corrompt. Si ton profil était synchronisé, Aria garderait ses données dans `%LOCALAPPDATA%`.
+- Ne le place pas dans OneDrive : une base synchronisée pendant qu'elle tourne se corrompt. Si ton profil était synchronisé, Aria garderait ses données et son cache dans `%LOCALAPPDATA%\AriaVault`.
 - Au premier lancement de la v0.8, les données des versions précédentes sont déplacées automatiquement depuis `%LOCALAPPDATA%\AriaVault` (et `AriaVaultwarden` pour les v0.3 et avant). Une coupure en plein déplacement est reprise au lancement suivant.
 
 ## Sécurité
