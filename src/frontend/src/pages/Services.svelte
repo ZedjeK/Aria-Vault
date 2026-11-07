@@ -1,4 +1,8 @@
 <script>
+  // Services : synchronisation instantanée (relais push de Bitwarden) et
+  // e-mails (SMTP, Gmail préconfiguré), chacun avec son tuto, plus l'e-mail de
+  // test et l'autorisation des invitations.
+
   import Icon from '../lib/Icon.svelte'
   import Switch from '../lib/Switch.svelte'
   import {

@@ -1,4 +1,7 @@
 <script>
+  // Journal : les derniers événements d'Aria (les mêmes que aria.log), qui
+  // défilent tout seuls tant qu'on reste en bas de la liste.
+
   import { tick } from 'svelte'
   import { app, refreshJournal } from '../lib/state.svelte.js'
 
@@ -21,7 +24,7 @@
   </div>
   <p class="page-intro">
     Les derniers événements d'Aria, de Vaultwarden et du certificat. Copie complète dans
-    <span class="mono">{app.status?.base ?? '%LOCALAPPDATA%\\AriaVault'}\aria.log</span>.
+    <span class="mono">{app.status?.base ?? '%USERPROFILE%\\.Aria-Vault'}\aria.log</span>.
   </p>
 
   <section class="card">

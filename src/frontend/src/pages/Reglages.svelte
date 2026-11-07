@@ -1,4 +1,8 @@
 <script>
+  // Réglages : serveur (démarrer, arrêter), inscriptions, dossier du coffre,
+  // lancement à l'ouverture de session, mise en veille, mises à jour et
+  // rappel des raccourcis clavier.
+
   import Switch from '../lib/Switch.svelte'
   import {
     app, start, stop, setAutostart, setInscriptions, openData, setEmpecherVeille, setVerifMaj, checkUpdate, openRelease,

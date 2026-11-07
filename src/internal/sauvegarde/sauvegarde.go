@@ -34,14 +34,20 @@ import (
 )
 
 const (
-	Prefixe           = "aria-vault-"
-	Extension         = ".zip"
+	// Prefixe de tous les noms de sauvegarde.
+	Prefixe = "aria-vault-"
+	// Extension d'une sauvegarde en clair.
+	Extension = ".zip"
+	// ExtensionChiffree : sauvegarde chiffrée par une phrase de passe.
 	ExtensionChiffree = ".zip.chiffre"
 	Garder            = 10 // sauvegardes conservées par la rotation
 
+	// formatDate : date dans le nom, triable comme du texte.
 	formatDate = "2006-01-02_150405"
-	manifeste  = "aria-vault.json"
-	base       = "db.sqlite3"
+	// manifeste : fichier de description ajouté dans chaque zip.
+	manifeste = "aria-vault.json"
+	// base : la base SQLite, sans laquelle une sauvegarde n'est pas un coffre.
+	base = "db.sqlite3"
 )
 
 // Ce qui est sauvegardé, relativement au dossier data.
@@ -51,6 +57,7 @@ var (
 	dossiers = []string{"attachments", "sends"}
 )
 
+// magieChiffree identifie une sauvegarde chiffrée (format 1).
 var magieChiffree = []byte("ARIABAK1")
 
 // Info décrit une sauvegarde.
@@ -65,6 +72,7 @@ type Info struct {
 // EstChiffree indique si le nom désigne une sauvegarde chiffrée.
 func EstChiffree(nom string) bool { return strings.HasSuffix(nom, ExtensionChiffree) }
 
+// manifest : contenu de aria-vault.json dans le zip.
 type manifest struct {
 	Format   string    `json:"format"`
 	Version  int       `json:"version"`
@@ -139,6 +147,7 @@ func Creer(donnees, dest string, now time.Time, phrase string) (Info, error) {
 	return Info{Nom: nom, Chemin: final, Date: now, Taille: st.Size(), Chiffree: phrase != ""}, nil
 }
 
+// chiffrerFichier chiffre src dans dst (créé avec des droits restreints).
 func chiffrerFichier(src, dst, phrase string) error {
 	in, err := os.Open(src)
 	if err != nil {
@@ -160,6 +169,7 @@ func chiffrerFichier(src, dst, phrase string) error {
 	return out.Close()
 }
 
+// dechiffrerFichier déchiffre une sauvegarde vers dst.
 func dechiffrerFichier(src string, dst io.Writer, phrase string) error {
 	in, err := os.Open(src)
 	if err != nil {
@@ -236,6 +246,7 @@ func aSauvegarder(donnees string) ([]string, error) {
 	return out, nil
 }
 
+// ecrireZip écrit le zip : chaque élément du coffre, puis le manifeste.
 func ecrireZip(chemin, donnees string, elements []string, now time.Time) error {
 	f, err := os.OpenFile(chemin, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o600)
 	if err != nil {
@@ -270,6 +281,7 @@ func ecrireZip(chemin, donnees string, elements []string, now time.Time) error {
 	return f.Close()
 }
 
+// ajouter copie un fichier du coffre dans le zip, avec sa date.
 func ajouter(zw *zip.Writer, donnees, rel string) error {
 	src, err := os.Open(filepath.Join(donnees, filepath.FromSlash(rel)))
 	if err != nil {
@@ -337,6 +349,9 @@ func Verifier(chemin, phrase string) error {
 	return nil
 }
 
+// cheminSur refuse les chemins dangereux d'une archive (absolus, « .. »,
+// barres obliques inverses) : une archive piégée ne doit rien écrire hors du
+// dossier de destination.
 func cheminSur(nom string) bool {
 	return nom != "" && !strings.Contains(nom, `\`) && filepath.IsLocal(filepath.FromSlash(nom))
 }
@@ -518,11 +533,13 @@ func Reparer(donnees string) (string, error) {
 	return fmt.Sprintf("Restauration interrompue lors du dernier lancement : coffre précédent remis en place (%s)", filepath.Base(ancien)), nil
 }
 
+// existe indique si le chemin existe (sans suivre un lien).
 func existe(p string) bool {
 	_, err := os.Lstat(p)
 	return err == nil
 }
 
+// extraire décompresse l'archive dans dst, chemins vérifiés.
 func extraire(archive, dst string) error {
 	zr, err := zip.OpenReader(archive)
 	if err != nil {
@@ -562,6 +579,7 @@ func extraire(archive, dst string) error {
 	return nil
 }
 
+// copier copie un fichier, en créant les dossiers parents.
 func copier(src, dst string) error {
 	if err := os.MkdirAll(filepath.Dir(dst), 0o700); err != nil {
 		return err

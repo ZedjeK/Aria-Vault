@@ -1,3 +1,10 @@
+// Méthodes de la page Sauvegardes : sauvegarder (à la demande et chaque jour),
+// restaurer, importer un ancien coffre, choisir le dossier, chiffrer, et
+// exporter ou importer les réglages d'Aria (.ariavault).
+//
+// Une seule opération sur le coffre à la fois (svgMu) ; le serveur est mis en
+// pause le temps de la copie pour que la base SQLite soit cohérente.
+
 package main
 
 import (
@@ -195,6 +202,9 @@ func (s *VaultService) ImportVault() (bool, error) {
 	})
 }
 
+// remplacerCoffre encadre une restauration ou un import : serveur arrêté,
+// fn remplace le dossier data (l'ancien est mis de côté, jamais supprimé),
+// puis le serveur repart s'il tournait. titre sert au journal.
 func (s *VaultService) remplacerCoffre(titre string, fn func(time.Time) (string, error)) error {
 	s.svgMu.Lock()
 	defer s.svgMu.Unlock()
@@ -226,6 +236,7 @@ func (s *VaultService) pauseServeur(motif string) bool {
 	return false
 }
 
+// repriseServeur relance le serveur après une pause, s'il tournait avant.
 func (s *VaultService) repriseServeur(relancer bool) {
 	if !relancer {
 		return
@@ -410,6 +421,7 @@ func (s *VaultService) ImportSettings(phrase string) ImportResult {
 
 // ---------- Accès à config.json ----------
 
+// lireConfig lit config.json sous cfgMu (jamais pendant une écriture).
 func (s *VaultService) lireConfig() (*config.Config, error) {
 	s.cfgMu.Lock()
 	defer s.cfgMu.Unlock()
@@ -428,6 +440,7 @@ func (s *VaultService) majConfig(fn func(*config.Config)) error {
 	return cfg.Save(s.p.Config)
 }
 
+// taille affiche une taille de fichier lisible (412 Ko, 3,2 Mo).
 func taille(n int64) string {
 	switch {
 	case n >= 1<<20:
@@ -438,6 +451,7 @@ func taille(n int64) string {
 	return fmt.Sprintf("%d o", n)
 }
 
+// servicesImportes complète le message du journal après un import de réglages.
 func servicesImportes(imp config.Importe) string {
 	switch {
 	case imp.Push != nil && imp.SMTP != nil:

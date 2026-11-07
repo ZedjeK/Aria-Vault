@@ -1,5 +1,8 @@
 //go:build windows
 
+// Retrouver le programme qui occupe un port, pour un message d'erreur utile
+// (« le port 443 est occupé par caddy (PID 1234) »), via PowerShell.
+
 package ports
 
 import (

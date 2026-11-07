@@ -1,4 +1,9 @@
 <script>
+  // Accueil : tableau de bord. L'état du coffre en grand, les « moteurs »
+  // (chaque ligne résume une page et y mène), les actions rapides et les
+  // derniers événements. La disposition passe de 1 à 2 puis 3 zones selon la
+  // largeur de la fenêtre (container queries sur .dash).
+
   import { onMount } from 'svelte'
   import Logo from '../lib/Logo.svelte'
   import Icon from '../lib/Icon.svelte'

@@ -1,3 +1,9 @@
+// VaultService est le pont entre l'interface Svelte et le Go : chacune de ses
+// méthodes exportées est appelable depuis le frontend (Call.ByName
+// « main.VaultService.<Méthode> »). Ce fichier regroupe l'état général, la
+// page HTTPS, les réglages, l'IP publiée, les mises à jour et la veille ;
+// sauvegardes.go et services.go complètent le service.
+
 package main
 
 import (
@@ -47,6 +53,8 @@ type VaultService struct {
 	onMaj     func()     // appelé quand l'état des mises à jour change (icône)
 }
 
+// nouveauService crée le service ; le moteur et l'appli Wails sont branchés
+// ensuite dans main (ils ont besoin du service pour exister).
 func nouveauService(p paths.Paths, j *journal.Journal) *VaultService {
 	return &VaultService{
 		p: p, j: j,
@@ -207,9 +215,6 @@ func (s *VaultService) Start() error { return s.moteur.Start() }
 // Stop arrête le coffre.
 func (s *VaultService) Stop() { s.moteur.Stop() }
 
-// Restart relance le coffre.
-func (s *VaultService) Restart() error { return s.moteur.Restart() }
-
 // SetInscriptions ouvre ou ferme la création de comptes.
 func (s *VaultService) SetInscriptions(on bool) error {
 	if err := s.majConfig(func(c *config.Config) { c.Inscriptions = on }); err != nil {
@@ -290,6 +295,8 @@ func (s *VaultService) relancerSiActif() error {
 	return nil
 }
 
+// demander réveille une boucle de fond sans jamais bloquer : si une demande
+// attend déjà, la nouvelle est inutile.
 func (s *VaultService) demander(c chan struct{}) {
 	select {
 	case c <- struct{}{}:
@@ -404,6 +411,8 @@ func (s *VaultService) CheckUpdate() (maj.Info, error) {
 	return info, err
 }
 
+// signalerMaj prévient main que l'état des mises à jour a changé (menu de
+// l'icône).
 func (s *VaultService) signalerMaj() {
 	if s.onMaj != nil {
 		s.onMaj()
@@ -482,6 +491,8 @@ func (s *VaultService) OpenRelease() error {
 
 var majAnnoncee atomic.Value // version déjà notée dans le journal
 
+// annoncerMaj note une nouvelle version dans le journal, une seule fois par
+// version.
 func (s *VaultService) annoncerMaj(info maj.Info) {
 	if info.Disponible && majAnnoncee.Swap(info.Version) != info.Version {
 		s.j.Add(journal.Info, "Aria Vault %s est disponible (tu as la %s)", info.Version, version)

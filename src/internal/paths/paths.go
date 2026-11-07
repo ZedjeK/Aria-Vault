@@ -49,6 +49,9 @@ func Migrer(racine string) (p Paths, msg string, err error) {
 	return migrer(racine, 20, 500*time.Millisecond)
 }
 
+// migrer fait le travail de Migrer ; essais et pause sont réglables pour les
+// tests (un antivirus ou l'Explorateur peut bloquer un renommage quelques
+// secondes).
 func migrer(racine string, essais int, pause time.Duration) (Paths, string, error) {
 	nouveau := filepath.Join(racine, Dossier)
 	ancien := filepath.Join(racine, AncienDossier)
@@ -65,6 +68,7 @@ func migrer(racine string, essais int, pause time.Duration) (Paths, string, erro
 	return In(ancien), "", fmt.Errorf("renommage de %s impossible, Aria continue dessus pour cette fois : %w", ancien, err)
 }
 
+// existe indique si le chemin existe (fichier ou dossier).
 func existe(p string) bool {
 	_, err := os.Stat(p)
 	return err == nil

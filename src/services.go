@@ -1,3 +1,8 @@
+// Méthodes de la page Services : synchronisation instantanée (relais push de
+// Bitwarden), e-mails (SMTP) et invitations. Chaque enregistrement valide les
+// champs, chiffre les secrets avec DPAPI, puis relance le serveur s'il tourne
+// pour que Vaultwarden prenne les nouvelles variables d'environnement.
+
 package main
 
 import (
@@ -29,6 +34,7 @@ type SMTPView struct {
 	De          string `json:"de"`
 }
 
+// vuePush prépare l'état affiché (jamais la clé).
 func vuePush(c *config.Config) PushView {
 	if c.Push == nil {
 		return PushView{}
@@ -36,6 +42,7 @@ func vuePush(c *config.Config) PushView {
 	return PushView{Actif: true, Region: c.Push.Region, ID: c.Push.ID}
 }
 
+// vueSMTP prépare l'état affiché (jamais le mot de passe).
 func vueSMTP(c *config.Config) SMTPView {
 	if c.SMTP == nil {
 		return SMTPView{}

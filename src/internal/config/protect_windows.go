@@ -1,5 +1,9 @@
 //go:build windows
 
+// Chiffrement des secrets avec DPAPI (CryptProtectData), lié au compte
+// Windows : un autre compte, ou un autre PC, ne peut pas les déchiffrer.
+// C'est pour ça que l'export .ariavault existe.
+
 package config
 
 import (
@@ -11,6 +15,7 @@ import (
 // Chiffrement DPAPI lié au compte Windows courant.
 const dpapiName = "Aria Vault"
 
+// protect chiffre plain pour le compte Windows courant.
 func protect(plain []byte) ([]byte, error) {
 	if len(plain) == 0 {
 		return nil, nil
@@ -28,6 +33,7 @@ func protect(plain []byte) ([]byte, error) {
 	return append([]byte(nil), unsafe.Slice(out.Data, out.Size)...), nil
 }
 
+// unprotect déchiffre un secret produit par protect.
 func unprotect(data []byte) ([]byte, error) {
 	if len(data) == 0 {
 		return nil, nil

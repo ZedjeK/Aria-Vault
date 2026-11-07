@@ -3,9 +3,16 @@
 # Vaultwarden depuis le source officiel dani-garcia/vaultwarden et récupère
 # l'interface web officielle vérifiée par checksum, puis appelle ce script.
 #
-# Usage : powershell -ExecutionPolicy Bypass -File .\build.ps1 -Vaultwarden <dossier> [-VaultwardenVersion 1.37.4] [-Version 0.2.0]
+# Usage : powershell -ExecutionPolicy Bypass -File .\build.ps1 -Vaultwarden <dossier> [-VaultwardenVersion 1.37.5] [-Version 0.8.1]
 #   <dossier> contient vaultwarden.exe et web-vault\
-# Prérequis : Go 1.26 ou plus, Node.js LTS.
+# Prérequis : Go 1.26 ou plus (le dernier correctif de préférence), Node.js LTS.
+#
+# Étapes : Vaultwarden compressé dans src\internal\vaultwarden\assets (embarqué
+# par go:embed), interface Svelte compilée dans src\frontend\dist, icône et
+# métadonnées Windows (go-winres), puis go build sans console.
+#
+# La version par défaut ci-dessous est LA version d'Aria : la CI la lit pour
+# nommer la release, et la veille Vaultwarden l'augmente toute seule.
 
 param(
     [Parameter(Mandatory = $true)] [string] $Vaultwarden,

@@ -1,5 +1,9 @@
 //go:build windows
 
+// Relève sous Windows : un événement nommé (Local\AriaVault-fermeture) sert
+// de signal entre instances, et les processus sont identifiés par leur PID et
+// leur date de création (un PID peut être réutilisé par un autre programme).
+
 package releve
 
 import (
@@ -39,6 +43,7 @@ func EcouterFermeture(fermer func()) error {
 	return nil
 }
 
+// demanderFermeture déclenche l'événement écouté par l'instance en cours.
 func demanderFermeture() error {
 	nom, err := windows.UTF16PtrFromString(nomSignal)
 	if err != nil {
@@ -52,6 +57,7 @@ func demanderFermeture() error {
 	return windows.SetEvent(h)
 }
 
+// creationDe renvoie la date de création du processus pid.
 func creationDe(pid uint32) (int64, error) {
 	h, err := windows.OpenProcess(windows.PROCESS_QUERY_LIMITED_INFORMATION, false, pid)
 	if err != nil {

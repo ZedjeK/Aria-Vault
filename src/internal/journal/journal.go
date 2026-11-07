@@ -14,6 +14,7 @@ import (
 )
 
 const (
+	// maxEntries : lignes gardées en mémoire pour la page Journal (aria.log garde tout).
 	maxEntries = 300
 	maxFile    = 1 << 20 // au-delà, aria.log devient aria.log.1
 )
@@ -82,17 +83,22 @@ func (j *Journal) Entries() []Entry {
 // Core renvoie un cœur zap qui recopie les messages de certmagic dans le journal.
 func (j *Journal) Core() zapcore.Core { return &core{j: j} }
 
+// core implémente zapcore.Core : CertMagic écrit ses messages avec zap, ils
+// arrivent ainsi dans le journal d'Aria au lieu d'une console invisible.
 type core struct {
 	j      *Journal
 	fields []zapcore.Field
 }
 
+// Enabled : seuls les messages d'information et plus graves sont retenus.
 func (c *core) Enabled(l zapcore.Level) bool { return l >= zapcore.InfoLevel }
 
+// With ajoute des champs de contexte (comme le domaine) aux messages suivants.
 func (c *core) With(fields []zapcore.Field) zapcore.Core {
 	return &core{j: c.j, fields: append(append([]zapcore.Field(nil), c.fields...), fields...)}
 }
 
+// Check accepte le message si son niveau est retenu.
 func (c *core) Check(e zapcore.Entry, ce *zapcore.CheckedEntry) *zapcore.CheckedEntry {
 	if c.Enabled(e.Level) {
 		return ce.AddCore(e, c)
@@ -103,6 +109,8 @@ func (c *core) Check(e zapcore.Entry, ce *zapcore.CheckedEntry) *zapcore.Checked
 // Champs utiles à l'utilisateur ; le reste (identifiants internes…) est omis.
 var kept = []string{"identifier", "identifiers", "error", "remaining", "challenge_type"}
 
+// Write traduit un message de CertMagic en ligne de journal lisible, en ne
+// gardant que les champs utiles (domaine, erreur…).
 func (c *core) Write(e zapcore.Entry, fields []zapcore.Field) error {
 	enc := zapcore.NewMapObjectEncoder()
 	for _, f := range append(append([]zapcore.Field(nil), c.fields...), fields...) {
@@ -123,4 +131,5 @@ func (c *core) Write(e zapcore.Entry, fields []zapcore.Field) error {
 	return nil
 }
 
+// Sync : rien à vider, le journal écrit directement.
 func (c *core) Sync() error { return nil }

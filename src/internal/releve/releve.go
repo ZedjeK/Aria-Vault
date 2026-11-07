@@ -25,9 +25,12 @@ import (
 )
 
 const (
+	// fichier décrit l'instance en cours (dans le cache, %LOCALAPPDATA%\AriaVault).
 	fichier       = "instance.json"
 	attentePropre = 20 * time.Second // le serveur peut mettre quelques secondes à s'arrêter
-	attenteForce  = 5 * time.Second
+	// attenteForce : délai supplémentaire après l'arrêt forcé d'une instance qui
+	// ne répond pas.
+	attenteForce = 5 * time.Second
 )
 
 // Instance décrit l'Aria en cours d'exécution.
@@ -63,6 +66,7 @@ func Effacer(base string) {
 	}
 }
 
+// lire charge instance.json depuis le dossier base.
 func lire(base string) (Instance, error) {
 	data, err := os.ReadFile(filepath.Join(base, fichier))
 	if err != nil {
@@ -132,6 +136,7 @@ func PlusRecente(a, b string) bool {
 	return false
 }
 
+// parse lit une version « 1.2.3 » (ou « v1.2.3 »).
 func parse(v string) ([3]int, bool) {
 	var out [3]int
 	parts := strings.Split(strings.TrimPrefix(strings.TrimSpace(v), "v"), ".")
@@ -148,6 +153,7 @@ func parse(v string) ([3]int, bool) {
 	return out, true
 }
 
+// ancienne : une instance d'Aria Vaultwarden (v0.3), repérée par son processus.
 type ancienne struct {
 	pid uint32
 	nom string

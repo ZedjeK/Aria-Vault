@@ -1,3 +1,5 @@
+// Point d'entrée de l'interface : polices, thème, puis montage de App.svelte
+// dans index.html. Vite compile le tout dans dist/, que Wails embarque dans l'exe.
 import { mount } from 'svelte'
 
 // Polices embarquées dans l'exe : aucune requête vers Google Fonts au lancement.

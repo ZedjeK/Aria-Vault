@@ -1,3 +1,7 @@
+// Placement de la fenêtre principale : taille adaptée à l'écran au premier
+// lancement, puis taille, position et agrandissement retenus d'un lancement
+// à l'autre (voir internal/fenetre pour le calcul, ici le branchement Wails).
+
 package main
 
 import (
@@ -23,6 +27,8 @@ type suiviFenetre struct {
 	minuteur *time.Timer
 }
 
+// nouveauSuivi prépare le suivi ; la fenêtre (f.w) est renseignée juste
+// après sa création dans main.
 func nouveauSuivi(base string) *suiviFenetre {
 	return &suiviFenetre{chemin: filepath.Join(base, "fenetre.json")}
 }
@@ -89,6 +95,9 @@ func (f *suiviFenetre) planifier() {
 	f.minuteur = time.AfterFunc(500*time.Millisecond, f.enregistrer)
 }
 
+// enregistrer écrit fenetre.json. Une fenêtre cachée ou réduite ne dit rien
+// d'utile sur sa taille : on garde alors l'état précédent. Quand elle est
+// agrandie, on retient sa dernière taille « normale » pour la restaurer.
 func (f *suiviFenetre) enregistrer() {
 	if !f.w.IsVisible() || f.w.IsMinimised() {
 		return
@@ -104,6 +113,7 @@ func (f *suiviFenetre) enregistrer() {
 	_ = fenetre.Enregistrer(f.chemin, e)
 }
 
+// versRect convertit un rectangle Wails (pixels logiques) en fenetre.Rect.
 func versRect(r application.Rect) fenetre.Rect {
 	return fenetre.Rect{X: r.X, Y: r.Y, Largeur: r.Width, Hauteur: r.Height}
 }

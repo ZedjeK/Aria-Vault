@@ -1,4 +1,9 @@
 <script>
+  // Sauvegardes : dossier, sauvegarde à la demande et quotidienne, chiffrement
+  // par phrase de passe, historique avec restauration (phrase demandée pour une
+  // sauvegarde chiffrée si besoin), import d'un ancien coffre, et export ou
+  // import des réglages d'Aria (.ariavault).
+
   import { onMount } from 'svelte'
   import Switch from '../lib/Switch.svelte'
   import {

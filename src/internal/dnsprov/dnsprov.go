@@ -57,6 +57,8 @@ type Fournisseur struct {
 	Note     string  `json:"note,omitempty"`
 }
 
+// liste décrit chaque fournisseur : champs à saisir et tutoriel affiché dans
+// la page HTTPS. Les libellés suivent les interfaces des fournisseurs.
 var liste = []Fournisseur{
 	{
 		ID:      DuckDNS,
@@ -146,10 +148,13 @@ func Trouver(id string) (Fournisseur, bool) {
 }
 
 var (
-	uuidRe  = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$`)
-	cleRe   = regexp.MustCompile(`^[!-~]{8,300}$`) // caractères imprimables, sans espace
+	// uuidRe : format d'un jeton DuckDNS.
+	uuidRe = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$`)
+	cleRe  = regexp.MustCompile(`^[!-~]{8,300}$`) // caractères imprimables, sans espace
+	// labelRe : une étiquette de nom de domaine (entre deux points).
 	labelRe = regexp.MustCompile(`^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$`)
-	tldRe   = regexp.MustCompile(`^([a-z]{2,63}|xn--[a-z0-9-]{1,59})$`)
+	// tldRe : une extension (fr, com, io…) ou un domaine international (xn--…).
+	tldRe = regexp.MustCompile(`^([a-z]{2,63}|xn--[a-z0-9-]{1,59})$`)
 )
 
 // NormaliserDomaine accepte « https://Vault.Exemple.fr/ » comme « vault.exemple.fr »
@@ -218,6 +223,7 @@ func Valider(id string, ids map[string]string) (map[string]string, map[string]st
 	return propres, erreurs
 }
 
+// contient indique si v figure dans l.
 func contient(l []string, v string) bool {
 	for _, x := range l {
 		if x == v {

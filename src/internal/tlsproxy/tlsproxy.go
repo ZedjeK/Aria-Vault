@@ -1,6 +1,7 @@
 // Package tlsproxy sert le coffre en HTTPS : certificat Let's Encrypt obtenu et
 // renouvelé par certmagic (le moteur de Caddy) en validation DNS-01 chez le
-// fournisseur DNS choisi (DuckDNS, Cloudflare, OVH, deSEC), puis relais vers Vaultwarden qui n'écoute que sur 127.0.0.1.
+// fournisseur DNS choisi (DuckDNS, Cloudflare, OVH, deSEC), puis relais vers
+// Vaultwarden, qui n'écoute que sur 127.0.0.1.
 //
 // Aucun port n'a besoin d'être ouvert sur la box : DNS-01 prouve le contrôle du
 // domaine par un enregistrement TXT, sans connexion entrante.

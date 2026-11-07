@@ -208,6 +208,7 @@ func (v *Veilleur) Verifier(ctx context.Context, p *dnsprov.Publieur, actif bool
 	return fmt.Sprintf("Adresse de %s publiée : %s", p.Domaine, l.IP), nil
 }
 
+// echec mémorise l'erreur pour l'affichage et la renvoie.
 func (v *Veilleur) echec(err error) error {
 	v.mu.Lock()
 	v.etat.Erreur = err.Error()

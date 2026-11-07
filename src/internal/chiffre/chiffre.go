@@ -30,14 +30,18 @@ import (
 )
 
 const (
+	// PhraseMin : longueur minimale d'une phrase de passe, en caractères.
 	PhraseMin = 8
 
 	// Paramètres scrypt recommandés pour un usage interactif (~0,3 s, 128 Mo).
 	logN, paramR, paramP = 17, 8, 1
 
+	// tailleBase : magie (8) + paramètres scrypt (3) + sel (16).
 	tailleBase = 8 + 3 + 16
+	// tailleBloc : taille d'un bloc en clair du flux chiffré (64 Kio).
 	tailleBloc = 64 << 10
-	tailleTag  = 16
+	// tailleTag : étiquette d'authentification GCM ajoutée à chaque bloc.
+	tailleTag = 16
 )
 
 // ErrPhrase signale une phrase de passe incorrecte (ou des données altérées).
@@ -129,6 +133,9 @@ func Ouvrir(phrase string, magie, data []byte) ([]byte, error) {
 	return clair, nil
 }
 
+// nonceBloc construit le nonce d'un bloc : préfixe aléatoire (7 o), numéro
+// du bloc (4 o) et indicateur de dernier bloc (1 o). Le même nonce ne sert
+// jamais deux fois, et ni l'ordre ni la fin du flux ne peuvent être modifiés.
 func nonceBloc(prefixe []byte, compteur uint32, dernier bool) []byte {
 	n := make([]byte, 12)
 	copy(n, prefixe)

@@ -23,10 +23,14 @@ import (
 type Etat string
 
 const (
-	Arrete    Etat = "arrete"
+	// Arrete : rien ne tourne.
+	Arrete Etat = "arrete"
+	// Demarrage : Vaultwarden démarre, ou le certificat est en cours d'obtention.
 	Demarrage Etat = "demarrage"
-	Actif     Etat = "actif"
-	Erreur    Etat = "erreur"
+	// Actif : Vaultwarden et le HTTPS tournent.
+	Actif Etat = "actif"
+	// Erreur : le démarrage a échoué ou un composant s'est arrêté (détail dans Status).
+	Erreur Etat = "erreur"
 )
 
 // PortLocal est le port de Vaultwarden, joignable uniquement depuis le PC.
@@ -124,6 +128,10 @@ func (m *Moteur) Start() error {
 	return nil
 }
 
+// run démarre Vaultwarden puis le relais HTTPS, en arrière-plan, et surveille
+// les deux : si l'un s'arrête, le moteur passe en erreur. gen identifie ce
+// démarrage : un Stop ou un Restart plus récent rend ses mises à jour d'état
+// caduques.
 func (m *Moteur) run(ctx context.Context, gen int, cfg *config.Config, dns dnsprov.Client, finished chan struct{}) {
 	defer close(finished)
 
@@ -203,6 +211,8 @@ func (m *Moteur) optionsVW(cfg *config.Config) vaultwarden.Options {
 	return opts
 }
 
+// setDetail met à jour le texte d'état affiché, si ce démarrage est toujours
+// le démarrage courant.
 func (m *Moteur) setDetail(gen int, detail string) {
 	m.mu.Lock()
 	if gen != m.gen {
@@ -214,6 +224,8 @@ func (m *Moteur) setDetail(gen int, detail string) {
 	m.onChange()
 }
 
+// fail passe le moteur en erreur (si ce démarrage est toujours le courant) et
+// l'écrit au journal.
 func (m *Moteur) fail(gen int, format string, a ...any) {
 	msg := fmt.Sprintf(format, a...)
 	m.mu.Lock()

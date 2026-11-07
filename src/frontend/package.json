@@ -1,7 +1,7 @@
 {
   "name": "aria-vault-frontend",
+  "description": "Interface d'Aria Vault (Svelte 5 + Vite), compilée dans dist/ puis embarquée dans l'exe par Wails.",
   "private": true,
-  "version": "0.2.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -14,7 +14,7 @@
   },
   "devDependencies": {
     "@sveltejs/vite-plugin-svelte": "^7.3.1",
-    "svelte": "^5.57.2",
-    "vite": "^8.3.4"
+    "svelte": "^5.57.3",
+    "vite": "^8.3.6"
   }
 }

@@ -1,3 +1,7 @@
+// Réglages des services de Vaultwarden : synchronisation instantanée (relais
+// push de Bitwarden) et e-mails (SMTP). Les secrets (clé push, mot de passe
+// SMTP) sont chiffrés avec DPAPI comme les identifiants DNS.
+
 package config
 
 import (
@@ -35,9 +39,13 @@ var RegionsPush = map[string][2]string{
 var PortsSMTP = map[string]int{"starttls": 587, "force_tls": 465, "off": 25}
 
 var (
-	uuidRe  = regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`)
-	cleRe   = regexp.MustCompile(`^[!-~]{8,200}$`)
-	hoteRe  = regexp.MustCompile(`^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$`)
+	// uuidRe : format d'un Installation ID (UUID en minuscules).
+	uuidRe = regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`)
+	// cleRe : une clé ou un jeton copié-collé, sans espace.
+	cleRe = regexp.MustCompile(`^[!-~]{8,200}$`)
+	// hoteRe : nom d'un serveur SMTP (smtp.exemple.fr).
+	hoteRe = regexp.MustCompile(`^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$`)
+	// espaces retire les espaces des mots de passe d'application Google.
 	espaces = strings.NewReplacer(" ", "", " ", "")
 )
 

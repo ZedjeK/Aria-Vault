@@ -1,4 +1,10 @@
 <script>
+  // Cadre de l'appli : barre latérale (navigation, bouton « Ouvrir le coffre »,
+  // repli en icônes), bandeau de mise à jour et page affichée. Gère aussi les
+  // raccourcis clavier et les événements envoyés par le Go (« page » pour
+  // changer de page depuis le menu de l'icône, « maj-progression » pendant une
+  // installation).
+
   import { onMount } from 'svelte'
   import { Events } from '@wailsio/runtime'
   import Icon from './lib/Icon.svelte'

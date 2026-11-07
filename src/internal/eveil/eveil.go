@@ -6,6 +6,7 @@ package eveil
 import "sync"
 
 var (
+	// mu protège liberer : Regler peut être appelée depuis plusieurs goroutines.
 	mu      sync.Mutex
 	liberer func() // non nil tant que la veille est empêchée
 )

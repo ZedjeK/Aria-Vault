@@ -11,7 +11,18 @@
 </p>
 
 <p align="center">
-  <a href="../../releases/latest"><b>Télécharger la dernière version</b></a> · v0.8 · Windows 10/11 x64 · licence MIT · <a href="docs/SIGNATURE.md">Code signing policy</a>
+  <a href="https://github.com/ZedjeK/Aria-Vault/releases/latest"><img alt="Dernière version" src="https://img.shields.io/github/v/release/ZedjeK/Aria-Vault?label=version&color=7DF9FF&labelColor=030812"></a>
+  <a href="https://github.com/ZedjeK/Aria-Vault/actions/workflows/build.yml"><img alt="Compilation" src="https://img.shields.io/github/actions/workflow/status/ZedjeK/Aria-Vault/build.yml?label=compilation&labelColor=030812"></a>
+  <img alt="Windows 10/11 x64" src="https://img.shields.io/badge/Windows-10%20%7C%2011%20x64-5C8BFF?labelColor=030812">
+  <a href="LICENSE"><img alt="Licence MIT" src="https://img.shields.io/badge/licence-MIT-FF8A1F?labelColor=030812"></a>
+</p>
+
+<p align="center">
+  <a href="../../releases/latest"><b>Télécharger la dernière version</b></a> · <a href="docs/ARCHITECTURE.md">Comment ça marche</a> · <a href="docs/SIGNATURE.md">Code signing policy</a>
+</p>
+
+<p align="center">
+  <img src="docs/captures/accueil.png" width="860" alt="Accueil d'Aria Vault : état du coffre en ligne, moteurs, actions rapides et derniers événements">
 </p>
 
 ## Ce qu'il fait
@@ -28,6 +39,15 @@
 | **Synchronisation instantanée** | En option, ton téléphone voit chaque modification en quelques secondes, grâce au relais de notifications gratuit de Bitwarden |
 | **E-mails** | En option : alertes de nouvelle connexion, double authentification par e-mail, invitations. Gmail préconfiguré, bouton d'e-mail de test |
 | **Pas de veille** | En option, le PC ne s'endort pas tout seul tant que le coffre est en ligne |
+
+### En images
+
+| | |
+| --- | --- |
+| <img src="docs/captures/https.png" alt="Page HTTPS : domaine, tuto du fournisseur DNS et réservation de l'IP sur la box"> | <img src="docs/captures/services.png" alt="Page Services : synchronisation instantanée et e-mails"> |
+| **HTTPS** : fournisseur DNS avec son tuto, et réservation de l'IP du PC sur ta box | **Services** : synchronisation instantanée et e-mails, chacun avec son tuto |
+| <img src="docs/captures/sauvegardes.png" alt="Page Sauvegardes : dossier, chiffrement, historique et réglages exportables"> | |
+| **Sauvegardes** : chiffrées si tu veux, restaurées sans jamais rien supprimer | Captures faites avec des données d'exemple. |
 
 ## Avant de commencer
 
@@ -268,11 +288,15 @@ powershell -ExecutionPolicy Bypass -File .\build.ps1 -Vaultwarden D:\vaultwarden
 
 ## Structure
 
+Le fonctionnement complet, schémas à l'appui, est expliqué dans **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)**. Chaque fichier du code commence par un commentaire qui décrit son rôle.
+
 ```text
 src/
-├── main.go                 # appli Wails : fenêtre, icône, instance unique, relève
-├── vaultservice.go         # méthodes appelées par l'interface, IP, mises à jour, veille
+├── main.go                 # lancement : relève, migrations, appli Wails, icône et menu
+├── vaultservice.go         # méthodes appelées par l'interface : état, HTTPS, IP, mises à jour, veille
 ├── sauvegardes.go          # sauvegardes, restauration, réglages exportables
+├── services.go             # synchronisation instantanée, e-mails, invitations
+├── fenetre.go              # taille et position de la fenêtre retenues
 ├── internal/
 │   ├── vaultwarden/        # Vaultwarden embarqué : extraction vérifiée, processus enfant
 │   ├── tlsproxy/           # HTTPS : certificat Let's Encrypt (CertMagic, DNS-01) et relais
@@ -288,12 +312,15 @@ src/
 │   ├── fenetre/            # taille et position de la fenêtre retenues
 │   ├── releve/             # une nouvelle version prend la place de l'ancienne
 │   ├── demarrage/          # lancement à l'ouverture de session
-│   ├── paths/              # emplacements, migration depuis Aria Vaultwarden
+│   ├── paths/              # emplacements (.Aria-Vault, cache) et migrations
 │   ├── journal/            # journal de l'interface et aria.log
 │   └── ports/              # port occupé : par quel programme
 ├── frontend/src/           # interface Svelte (polices embarquées)
-└── build/                  # logo, icônes de l'exe et de la zone de notification
+└── build/                  # logo (logo.svg, et logo-petit.svg pour les icônes de 16 à 24 px),
+                            # icônes de l'exe et de la zone de notification
 ```
+
+À la racine : `build.ps1` (compilation de l'exe), `.github/` (workflows de compilation et de veille, notes de release), `docs/` (architecture, signature, captures) et `licences/` (texte de la GPL-3.0 joint aux releases).
 
 ## Licence
 

@@ -19,12 +19,16 @@ import (
 )
 
 const (
-	Depot      = "ZedjeK/Aria-Vault"
-	api        = "https://api.github.com/repos/" + Depot + "/releases/latest"
+	// Depot : le dépôt officiel, seule source acceptée pour les mises à jour.
+	Depot = "ZedjeK/Aria-Vault"
+	// api : dernière release publiée (les brouillons ne sont jamais renvoyés).
+	api = "https://api.github.com/repos/" + Depot + "/releases/latest"
+	// pagePrefix : début de toute page de release du dépôt.
 	pagePrefix = "https://github.com/" + Depot + "/releases/"
 	// Le zip ne peut venir que des releases du dépôt officiel.
 	telechargementPrefix = pagePrefix + "download/"
-	Intervalle           = 24 * time.Hour
+	// Intervalle entre deux vérifications automatiques.
+	Intervalle = 24 * time.Hour
 )
 
 // Info décrit la dernière version publiée.
@@ -43,6 +47,7 @@ type Info struct {
 	ExeSHA      string `json:"-"`
 }
 
+// release : les champs utiles de la réponse de l'API GitHub.
 type release struct {
 	TagName    string  `json:"tag_name"`
 	HTMLURL    string  `json:"html_url"`
@@ -52,6 +57,7 @@ type release struct {
 	Assets     []asset `json:"assets"`
 }
 
+// asset : un fichier joint à la release (le zip).
 type asset struct {
 	Name   string `json:"name"`
 	URL    string `json:"browser_download_url"`
@@ -59,6 +65,7 @@ type asset struct {
 	Size   int64  `json:"size"`
 }
 
+// shaRe : une empreinte SHA-256 en hexadécimal.
 var shaRe = regexp.MustCompile(`^[0-9a-f]{64}$`)
 
 // empreinte cherche dans les notes la ligne « <sha256>  <nom> ».
@@ -157,6 +164,7 @@ func (v *Verificateur) Verifier(ctx context.Context) (Info, error) {
 	return info, nil
 }
 
+// interroger appelle l'API GitHub et interprète sa réponse.
 func (v *Verificateur) interroger(ctx context.Context) (Info, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, v.adresse, nil)
 	if err != nil {

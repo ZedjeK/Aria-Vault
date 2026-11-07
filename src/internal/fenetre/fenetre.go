@@ -92,6 +92,8 @@ func Placer(e Etat, ok bool, ecrans []Rect, principal Rect) Etat {
 	return Etat{Rect: Defaut(principal), Agrandie: ok && e.Agrandie}
 }
 
+// visible indique si au moins un morceau de r, assez grand pour être attrapé
+// à la souris, se trouve sur l'écran s.
 func visible(r, s Rect) bool {
 	l := min(r.X+r.Largeur, s.X+s.Largeur) - max(r.X, s.X)
 	h := min(r.Y+r.Hauteur, s.Y+s.Hauteur) - max(r.Y, s.Y)

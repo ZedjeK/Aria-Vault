@@ -146,9 +146,12 @@ jobs:
       # ------------------------------------------------------------------
       # Aria
       # ------------------------------------------------------------------
+      # Toujours le dernier correctif de Go 1.26 : la bibliothèque standard
+      # (net/http, crypto/tls…) fait tourner le relais HTTPS d'Aria.
       - uses: actions/setup-go@v6
         with:
-          go-version-file: src/go.mod
+          go-version: "1.26.x"
+          check-latest: true
           cache-dependency-path: src/go.sum
 
       - uses: actions/setup-node@v4

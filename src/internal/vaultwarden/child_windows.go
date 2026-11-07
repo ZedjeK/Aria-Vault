@@ -1,5 +1,8 @@
 //go:build windows
 
+// Processus enfant sous Windows : pas de console, et rattachement à un « job »
+// qui tue Vaultwarden si Aria se ferme ou plante (KILL_ON_JOB_CLOSE).
+
 package vaultwarden
 
 import (
@@ -12,6 +15,7 @@ import (
 )
 
 var (
+	// jobOnce, job, jobErr : un seul job pour toute la durée de vie d'Aria.
 	jobOnce sync.Once
 	job     windows.Handle
 	jobErr  error

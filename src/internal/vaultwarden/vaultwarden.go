@@ -34,7 +34,9 @@ import (
 var assets embed.FS
 
 const (
-	exeAsset      = "assets/vaultwarden.exe.gz"
+	// exeAsset : vaultwarden.exe compressé, embarqué par build.ps1.
+	exeAsset = "assets/vaultwarden.exe.gz"
+	// webVaultAsset : l'interface web officielle (bw_web_builds).
 	webVaultAsset = "assets/web-vault.tar.gz"
 	versionAsset  = "assets/version.txt" // écrit par build.ps1
 	startTimeout  = 60 * time.Second     // la 1re ouverture d'un gros coffre peut migrer la base
@@ -196,6 +198,7 @@ func (s *Server) Stop() {
 	s.stopLocked()
 }
 
+// stopLocked arrête le processus (s.mu doit être tenu).
 func (s *Server) stopLocked() {
 	if s.cmd == nil || s.done == nil {
 		return

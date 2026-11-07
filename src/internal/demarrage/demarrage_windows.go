@@ -10,6 +10,8 @@ import (
 	"golang.org/x/sys/windows/registry"
 )
 
+// cleRun : clé du registre lue par Windows à l'ouverture de session (HKCU,
+// pas besoin de droits administrateur).
 const cleRun = `Software\Microsoft\Windows\CurrentVersion\Run`
 
 // Aligner migre l'ancienne entrée (v0.3) et fait pointer l'entrée active vers

@@ -9,7 +9,7 @@ import "strings"
 const (
 	// Noms des valeurs du registre, tels que Wails les dérive du nom de l'appli.
 	Ancien = "aria-vaultwarden" // v0.3 et avant
-	Actuel = "aria-vault"
+	Actuel = "aria-vault"       // v0.4 et suivantes
 )
 
 // Commande construit la ligne de commande enregistrée dans le registre.

@@ -1,4 +1,9 @@
 <script>
+  // Page HTTPS : fournisseur DNS, domaine et identifiants (avec le tuto du
+  // fournisseur choisi), adresse IP publiée, réservation de l'IP sur la box et
+  // certificat. Les secrets ne reviennent jamais du Go : un champ laissé vide
+  // garde la valeur enregistrée.
+
   import { onMount } from 'svelte'
   import Icon from '../lib/Icon.svelte'
   import Switch from '../lib/Switch.svelte'

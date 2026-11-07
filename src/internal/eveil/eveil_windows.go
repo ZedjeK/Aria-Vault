@@ -10,10 +10,13 @@ import (
 )
 
 const (
+	// esSystemRequired : le système doit rester éveillé.
 	esSystemRequired = 0x00000001
-	esContinuous     = 0x80000000
+	// esContinuous : l'état reste actif jusqu'au prochain appel.
+	esContinuous = 0x80000000
 )
 
+// procSetThreadExecutionState : absente de golang.org/x/sys, appelée directement.
 var procSetThreadExecutionState = windows.NewLazySystemDLL("kernel32.dll").NewProc("SetThreadExecutionState")
 
 // garder : l'état d'exécution est propre à un thread système. Une goroutine

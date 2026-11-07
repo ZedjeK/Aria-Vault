@@ -113,9 +113,12 @@ func choisirAuth(c *smtp.Client, s Serveur) smtp.Auth {
 // (STARTTLS ou TLS) avant, ce que vérifie SetSMTP côté réglages.
 type plainAuth struct{ u, p string }
 
+// Start envoie l'identifiant et le mot de passe en une fois (mécanisme PLAIN).
 func (a plainAuth) Start(*smtp.ServerInfo) (string, []byte, error) {
 	return "PLAIN", []byte("\x00" + a.u + "\x00" + a.p), nil
 }
+
+// Next : PLAIN n'attend aucune autre question du serveur.
 func (a plainAuth) Next(_ []byte, more bool) ([]byte, error) {
 	if more {
 		return nil, errors.New("réponse inattendue du serveur")
@@ -123,12 +126,17 @@ func (a plainAuth) Next(_ []byte, more bool) ([]byte, error) {
 	return nil, nil
 }
 
+// loginAuth : mécanisme LOGIN, le serveur demande l'identifiant puis le mot
+// de passe, chacun à son tour.
 type loginAuth struct {
 	u, p string
 	n    int
 }
 
+// Start annonce le mécanisme LOGIN.
 func (a *loginAuth) Start(*smtp.ServerInfo) (string, []byte, error) { return "LOGIN", nil, nil }
+
+// Next répond aux deux questions du serveur, dans l'ordre.
 func (a *loginAuth) Next(_ []byte, more bool) ([]byte, error) {
 	if !more {
 		return nil, nil

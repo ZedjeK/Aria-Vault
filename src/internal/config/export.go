@@ -16,10 +16,13 @@ import (
 // Windows qui l'importe.
 
 const (
+	// ExtensionExport : extension du fichier de réglages exporté.
 	ExtensionExport = ".ariavault"
-	PhraseMin       = chiffre.PhraseMin
+	// PhraseMin : longueur minimale de la phrase de passe de l'export.
+	PhraseMin = chiffre.PhraseMin
 )
 
+// magie identifie un fichier de réglages (version 2 du format, chiffré entier).
 var magie = []byte("ARIAVLT2")
 
 // ErrPhrase signale une phrase de passe incorrecte (ou un fichier altéré).

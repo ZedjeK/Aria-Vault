@@ -46,8 +46,17 @@ var trayOff []byte
 // version est fixée à la compilation (-X main.version=…).
 var version = "dev"
 
+// argSilencieux : passé par l'entrée du registre « lancer à l'ouverture de
+// session ». La fenêtre reste alors cachée si le coffre est déjà configuré.
 const argSilencieux = "--silencieux"
 
+// main enchaîne, dans cet ordre précis :
+//  1. la relève : une version plus ancienne encore lancée s'arrête ;
+//  2. les migrations d'emplacement (AriaVaultwarden, puis .Aria-Vault) ;
+//  3. la reprise d'une restauration interrompue ;
+//  4. la création de l'appli Wails (instance unique, fenêtre, icône et menu) ;
+//  5. au démarrage de l'appli : placement de la fenêtre, boucles de fond
+//     (sauvegarde quotidienne, IP publiée, mises à jour) et démarrage du coffre.
 func main() {
 	silencieux := slices.Contains(os.Args[1:], argSilencieux)
 
