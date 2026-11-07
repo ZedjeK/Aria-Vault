@@ -85,7 +85,7 @@ func TestFermerAdminSansJeton(t *testing.T) {
 func TestFermerAdminIllisible(t *testing.T) {
 	dir := t.TempDir()
 	// Un fichier qu'Aria ne sait pas relire ne doit pas passer en silence.
-	for _, contenu := range []string{`{"admin_token": "x"`, `["admin_token"]`, "﻿{\"admin_token\": \"x\"}"} {
+	for _, contenu := range []string{`{"admin_token": "x"`, `["admin_token"]`, "\ufeff{\"admin_token\": \"x\"}"} {
 		if err := os.WriteFile(filepath.Join(dir, "config.json"), []byte(contenu), 0o600); err != nil {
 			t.Fatal(err)
 		}
