@@ -12,7 +12,7 @@
 
 | Composant | Version | Source |
 |---|---|---|
-| Vaultwarden | {VW_VERSION} | compilé depuis le source officiel, sans modification : [dani-garcia/vaultwarden@{VW_COMMIT}](https://github.com/dani-garcia/vaultwarden/tree/{VW_COMMIT}) (AGPL-3.0) |
+| Vaultwarden | {VW_VERSION} | compilé depuis le source officiel, sans modification : [dani-garcia/vaultwarden@{VW_COMMIT}](https://github.com/dani-garcia/vaultwarden/tree/{VW_COMMIT}) (AGPL-3.0). Sources exactes jointes à cette release : `vaultwarden-{VW_VERSION}-sources.tar.gz` |
 | Interface web | {WEBVAULT} | [dani-garcia/bw_web_builds](https://github.com/dani-garcia/bw_web_builds/releases/tag/{WEBVAULT}), vérifiée par SHA-256 (GPL-3.0) |
 
 Le détail (commit d'Aria, toolchains) est dans `BUILDINFO.txt`, à l'intérieur du zip.

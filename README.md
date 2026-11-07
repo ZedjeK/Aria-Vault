@@ -324,6 +324,6 @@ src/
 
 ## Licence
 
-Code d'Aria Vault sous licence [MIT](LICENSE). Les composants embarqués gardent leur propre licence : Vaultwarden sous AGPL-3.0, l'interface web sous GPL-3.0. Leurs textes complets sont dans le zip de chaque release, la liste complète dans [LICENCES-TIERS.txt](LICENCES-TIERS.txt).
+Code d'Aria Vault sous licence [MIT](LICENSE). Les composants embarqués gardent leur propre licence : Vaultwarden sous AGPL-3.0, l'interface web sous GPL-3.0. Leurs textes complets sont dans le zip de chaque release, la liste complète dans [LICENCES-TIERS.txt](LICENCES-TIERS.txt). Chaque release joint aussi les sources exactes du Vaultwarden embarqué (`vaultwarden-<version>-sources.tar.gz`, archive du tag compilé), avec leur empreinte SHA-256 dans les notes de la release.
 
 Aria Vault n'est ni affilié ni approuvé par le projet Vaultwarden, ni par Bitwarden, Inc.

@@ -10,6 +10,9 @@ Vaultwarden
   BUILDINFO.txt et dans les notes de chaque release.
   Licence  : GNU Affero General Public License v3.0 (AGPL-3.0)
   Source   : https://github.com/dani-garcia/vaultwarden
+  Sources exactes : vaultwarden-<version>-sources.tar.gz, joint à chaque
+             release d'Aria Vault (archive du tag compilé, empreinte
+             SHA-256 dans les notes de la release et dans BUILDINFO.txt)
   Texte    : LICENCE-Vaultwarden-AGPL-3.0.txt (dans le zip de la release)
 
 Interface web (web vault)

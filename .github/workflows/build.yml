@@ -5,8 +5,9 @@
 # Actions → Compiler Aria Vault → Run workflow.
 #   - Vaultwarden vide = dernière release officielle.
 #   - Release « brouillon » : prépare la release v<version> (version lue dans
-#     build.ps1) avec le zip, les empreintes SHA-256 et l'attestation de
-#     provenance, sans la publier : un clic sur « Publish release » suffit.
+#     build.ps1) avec le zip, les sources exactes de Vaultwarden (AGPL-3.0),
+#     les empreintes SHA-256 et l'attestation de provenance, sans la publier :
+#     un clic sur « Publish release » suffit.
 #     « publier » la rend publique tout de suite.
 #   - La veille Vaultwarden (veille.yml) lance ce workflow en brouillon.
 
@@ -90,6 +91,23 @@ jobs:
           Write-Host "web-vault appariée : $v ; commit Vaultwarden : $commit"
           "version=$v" | Out-File $env:GITHUB_OUTPUT -Append
           "commit=$commit" | Out-File $env:GITHUB_OUTPUT -Append
+
+      # AGPL-3.0 : les sources exactes du Vaultwarden embarqué sont jointes à
+      # chaque release. git archive prend l'arbre du commit du tag, pas le
+      # dossier de travail : rien de la compilation n'y entre.
+      - name: Archiver les sources de Vaultwarden
+        id: sources
+        run: |
+          $v   = "${{ steps.vw.outputs.version }}"
+          $nom = "vaultwarden-$v-sources.tar.gz"
+          New-Item -ItemType Directory -Force release | Out-Null
+          $dest = Join-Path (Resolve-Path release) $nom
+          git -C vw-src archive --format=tar.gz --prefix="vaultwarden-$v/" -o $dest HEAD
+          if ($LASTEXITCODE -ne 0) { throw "Archive des sources de Vaultwarden impossible" }
+          $sha = (Get-FileHash $dest -Algorithm SHA256).Hash.ToLowerInvariant()
+          Write-Host "$nom : $sha"
+          "nom=$nom" | Out-File $env:GITHUB_OUTPUT -Append
+          "sha=$sha" | Out-File $env:GITHUB_OUTPUT -Append
 
       - uses: dtolnay/rust-toolchain@stable
         with:
@@ -218,6 +236,8 @@ jobs:
           Aria Vault $v
           Commit Aria         : $env:GITHUB_SHA
           Vaultwarden         : ${{ steps.vw.outputs.version }} (${{ steps.vault.outputs.commit }})
+          Sources Vaultwarden : ${{ steps.sources.outputs.nom }} (joint à chaque release)
+          SHA256 sources      : ${{ steps.sources.outputs.sha }}
           Interface web       : ${{ steps.vault.outputs.version }}
           Toolchains          : $(rustc --version) / $(go version) / node $(node --version)
           SHA256 Aria-Vault.exe :
@@ -236,6 +256,7 @@ jobs:
           subject-path: |
             dist/Aria-Vault.exe
             release/*.zip
+            release/*.tar.gz
 
       - uses: actions/upload-artifact@v4
         with:
@@ -261,10 +282,11 @@ jobs:
           $notes = $notes.Replace('{REPO_URL}', "$env:GITHUB_SERVER_URL/$env:GITHUB_REPOSITORY").Replace('{OWNER}', "$env:GITHUB_REPOSITORY_OWNER")
           $notes += "`n## Empreintes SHA-256`n`n" + '```' + "`n" +
             "${{ steps.dist.outputs.zip }}  Aria-Vault-$v.zip`n" +
-            "${{ steps.dist.outputs.exe }}  Aria-Vault.exe (dans le zip)`n" + '```' + "`n"
+            "${{ steps.dist.outputs.exe }}  Aria-Vault.exe (dans le zip)`n" +
+            "${{ steps.sources.outputs.sha }}  ${{ steps.sources.outputs.nom }}`n" + '```' + "`n"
           Set-Content notes.md $notes -Encoding utf8NoBOM -NoNewline
           Get-Content notes.md
           $opts = @()
           if ($env:MODE -eq 'brouillon') { $opts += '--draft' }
-          gh release create "v$v" (Get-ChildItem release/*.zip).FullName --title "Aria Vault $v" --notes-file notes.md --target $env:GITHUB_SHA @opts
+          gh release create "v$v" (Get-ChildItem release/*.zip, release/*.tar.gz).FullName --title "Aria Vault $v" --notes-file notes.md --target $env:GITHUB_SHA @opts
           if ($env:MODE -eq 'brouillon') { Write-Host "Brouillon prêt : à publier depuis l'onglet Releases." }
