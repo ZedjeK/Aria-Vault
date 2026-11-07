@@ -16,6 +16,12 @@
   const choisi = $derived(!!b?.dossier)
   const enLigne = $derived(['actif', 'demarrage'].includes(app.status?.moteur?.etat))
 
+  // Longueur minimale d'une nouvelle phrase (chiffre.PhraseMin côté Go). Comptée
+  // en caractères comme en Go, pas en unités UTF-16 : un emoji compte pour un.
+  const PHRASE_MIN = 12
+  const longueur = (s) => [...s].length
+  const tropCourte = (s) => s && longueur(s) < PHRASE_MIN
+
   let aConfirmer = $state('') // sauvegarde en attente de confirmation de restauration
   let message = $state('')
 
@@ -28,13 +34,13 @@
   let phraseSvg = $state('')
   let phraseSvg2 = $state('')
   let noteeSvg = $state(false)
-  const phraseSvgOk = $derived(phraseSvg.length >= 8 && phraseSvg === phraseSvg2 && noteeSvg)
+  const phraseSvgOk = $derived(longueur(phraseSvg) >= PHRASE_MIN && phraseSvg === phraseSvg2 && noteeSvg)
 
   let phraseExport = $state('')
   let phraseExport2 = $state('')
   let phraseImport = $state('')
   let montrerPhrases = $state(false)
-  const phraseOk = $derived(phraseExport.length >= 8 && phraseExport === phraseExport2)
+  const phraseOk = $derived(longueur(phraseExport) >= PHRASE_MIN && phraseExport === phraseExport2)
 
   onMount(loadBackups)
 
@@ -158,7 +164,8 @@
             Le zip contient déjà tes mots de passe chiffrés par ton mot de passe maître, mais aussi les clés du serveur, les
             adresses e-mail des comptes et les métadonnées. Avec cette option, tout le fichier est chiffré (scrypt + AES-256-GCM).
           </p>
-          <input type="password" bind:value={phraseSvg} placeholder="Phrase de passe (8 caractères min.)" autocomplete="new-password" />
+          <input type="password" bind:value={phraseSvg} placeholder="Phrase de passe ({PHRASE_MIN} caractères min.)" autocomplete="new-password" />
+          {#if tropCourte(phraseSvg)}<span class="field-error">Au moins {PHRASE_MIN} caractères (ici {longueur(phraseSvg)}).</span>{/if}
           <input type="password" bind:value={phraseSvg2} placeholder="La même, pour confirmer" autocomplete="new-password" />
           {#if phraseSvg2 && phraseSvg !== phraseSvg2}<span class="field-error">Les deux phrases sont différentes.</span>{/if}
           <p class="alerte">
@@ -264,7 +271,8 @@
       <div class="grid-2">
         <form class="form" onsubmit={(e) => { e.preventDefault(); exporter() }}>
           <span class="eyebrow">Exporter</span>
-          <input type={montrerPhrases ? 'text' : 'password'} bind:value={phraseExport} placeholder="Phrase de passe (8 caractères min.)" autocomplete="new-password" />
+          <input type={montrerPhrases ? 'text' : 'password'} bind:value={phraseExport} placeholder="Phrase de passe ({PHRASE_MIN} caractères min.)" autocomplete="new-password" />
+          {#if tropCourte(phraseExport)}<span class="field-error">Au moins {PHRASE_MIN} caractères (ici {longueur(phraseExport)}).</span>{/if}
           <input type={montrerPhrases ? 'text' : 'password'} bind:value={phraseExport2} placeholder="La même, pour confirmer" autocomplete="new-password" />
           {#if phraseExport2 && phraseExport !== phraseExport2}<span class="field-error">Les deux phrases sont différentes.</span>{/if}
           <button type="submit" class="btn-ghost" disabled={app.busy || !phraseOk || !app.status?.configure}>Exporter les réglages…</button>

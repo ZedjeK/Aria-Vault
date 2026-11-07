@@ -67,3 +67,57 @@ func TestFlux(t *testing.T) {
 		}
 	}
 }
+
+func TestLongueurPhrase(t *testing.T) {
+	const onze, douze = "onze lettre", "douze lettre"
+	if err := VerifierPhrase(onze); err == nil {
+		t.Errorf("nouvelle phrase de %d caractères acceptée", len(onze))
+	}
+	if err := VerifierPhrase(douze); err != nil {
+		t.Errorf("phrase de %d caractères refusée : %v", len(douze), err)
+	}
+	// Les caractères comptent, pas les octets : 12 lettres accentuées passent.
+	if err := VerifierPhrase("ééééééééééé"); err == nil {
+		t.Error("11 caractères accentués (22 octets) acceptés")
+	}
+	if err := VerifierPhrase("éééééééééééé"); err != nil {
+		t.Errorf("12 caractères accentués refusés : %v", err)
+	}
+	if _, err := Sceller(onze, magie, []byte("x")); err == nil {
+		t.Error("export scellé avec une phrase trop courte")
+	}
+	if err := VerifierPhraseEnregistree("sept ca"); err == nil {
+		t.Error("phrase enregistrée sous l'ancien minimum acceptée")
+	}
+}
+
+// Une phrase de 8 caractères, valable avant le passage à 12 : les fichiers
+// déjà faits avec elle doivent rester lisibles, et une phrase des sauvegardes
+// déjà enregistrée doit continuer de chiffrer.
+func TestAnciennePhrase(t *testing.T) {
+	const ancienne = "huit car"
+
+	var c bytes.Buffer
+	if err := Chiffrer(&c, bytes.NewReader([]byte("coffre")), ancienne, magie); err != nil {
+		t.Fatalf("phrase enregistrée de 8 caractères refusée : %v", err)
+	}
+	var d bytes.Buffer
+	if err := Dechiffrer(&d, bytes.NewReader(c.Bytes()), ancienne, magie); err != nil || d.String() != "coffre" {
+		t.Fatalf("ancienne sauvegarde illisible : %q, %v", d.String(), err)
+	}
+
+	// Fichier scellé comme le faisait Sceller avec l'ancien minimum.
+	h, err := entete(magie, 12)
+	if err != nil {
+		t.Fatal(err)
+	}
+	gcm, err := aeadDe(ancienne, h)
+	if err != nil {
+		t.Fatal(err)
+	}
+	scelle := gcm.Seal(h, h[tailleBase:], []byte("réglages"), h)
+	clair, err := Ouvrir(ancienne, magie, scelle)
+	if err != nil || string(clair) != "réglages" {
+		t.Fatalf("ancien export illisible : %q, %v", clair, err)
+	}
+}

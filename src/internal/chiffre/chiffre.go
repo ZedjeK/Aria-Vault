@@ -30,8 +30,13 @@ import (
 )
 
 const (
-	// PhraseMin : longueur minimale d'une phrase de passe, en caractères.
-	PhraseMin = 8
+	// PhraseMin : longueur minimale d'une nouvelle phrase de passe, en caractères.
+	PhraseMin = 12
+	// PhraseMinAncienne : l'ancien minimum. Une phrase des sauvegardes déjà
+	// enregistrée avec lui continue de chiffrer les sauvegardes quotidiennes.
+	// Le déchiffrement n'impose aucune longueur : les anciens fichiers restent
+	// lisibles.
+	PhraseMinAncienne = 8
 
 	// Paramètres scrypt recommandés pour un usage interactif (~0,3 s, 128 Mo).
 	logN, paramR, paramP = 17, 8, 1
@@ -50,9 +55,20 @@ var ErrPhrase = errors.New("phrase de passe incorrecte (ou fichier modifié)")
 // ErrFormat signale des données qui ne sont pas au format attendu.
 var ErrFormat = errors.New("format de fichier inconnu")
 
-// VerifierPhrase refuse une phrase trop courte.
+// VerifierPhrase refuse une nouvelle phrase trop courte (moins de PhraseMin
+// caractères).
 func VerifierPhrase(phrase string) error {
 	if len([]rune(phrase)) < PhraseMin {
+		return fmt.Errorf("la phrase de passe doit faire au moins %d caractères", PhraseMin)
+	}
+	return nil
+}
+
+// VerifierPhraseEnregistree accepte aussi une phrase choisie du temps de
+// l'ancien minimum (PhraseMinAncienne) : elle sert aux sauvegardes d'un PC
+// déjà configuré, qui ne doivent pas s'arrêter après une mise à jour.
+func VerifierPhraseEnregistree(phrase string) error {
+	if len([]rune(phrase)) < PhraseMinAncienne {
 		return fmt.Errorf("la phrase de passe doit faire au moins %d caractères", PhraseMin)
 	}
 	return nil
@@ -146,9 +162,10 @@ func nonceBloc(prefixe []byte, compteur uint32, dernier bool) []byte {
 	return n
 }
 
-// Chiffrer chiffre tout src dans dst.
+// Chiffrer chiffre tout src dans dst. La phrase vient des réglages : une
+// phrase enregistrée avec l'ancien minimum est encore acceptée.
 func Chiffrer(dst io.Writer, src io.Reader, phrase string, magie []byte) error {
-	if err := VerifierPhrase(phrase); err != nil {
+	if err := VerifierPhraseEnregistree(phrase); err != nil {
 		return err
 	}
 	h, err := entete(magie, 7)

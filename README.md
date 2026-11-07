@@ -220,9 +220,9 @@ Tout le coffre tient dans un petit zip : base SQLite, clés du serveur, pièces 
 
 - Aucune sauvegarde tant que tu n'as pas choisi le dossier : Aria ne décide pas à ta place où vont tes données.
 - Le serveur se met en pause quelques secondes le temps de la copie, puis repart. Le zip est relu et vérifié avant d'être gardé.
-- **Chiffrement (option)** : le zip contient aussi les clés du serveur, les adresses e-mail des comptes et les métadonnées. Avec une phrase de passe, tout le fichier est chiffré (scrypt + AES-256-GCM, par blocs authentifiés) : `aria-vault-<date>.zip.chiffre`. Le zip en clair n'existe que le temps de la copie, à côté du coffre, jamais dans le dossier des sauvegardes. Aria garde la phrase pour ton compte Windows (DPAPI) afin de faire la quotidienne ; **sur un autre PC, il te la faudra : sans elle, ces sauvegardes sont irrécupérables.**
+- **Chiffrement (option)** : le zip contient aussi les clés du serveur, les adresses e-mail des comptes et les métadonnées. Avec une phrase de passe (12 caractères minimum), tout le fichier est chiffré (scrypt + AES-256-GCM, par blocs authentifiés) : `aria-vault-<date>.zip.chiffre`. Le zip en clair n'existe que le temps de la copie, à côté du coffre, jamais dans le dossier des sauvegardes. Aria garde la phrase pour ton compte Windows (DPAPI) afin de faire la quotidienne ; **sur un autre PC, il te la faudra : sans elle, ces sauvegardes sont irrécupérables.** Une phrase de 8 à 11 caractères choisie avec une version précédente continue de fonctionner, pour les nouvelles sauvegardes comme pour restaurer les anciennes ; le journal t'invite simplement à en choisir une plus longue.
 - **Restaurer** met d'abord le coffre actuel de côté, dans `data.avant-restauration-<date>` : rien n'est jamais supprimé. Si une panne coupe Aria en plein remplacement, la restauration est terminée (ou annulée) au lancement suivant.
-- Les **réglages d'Aria** (fournisseur, domaine, e-mail, identifiants DNS) s'exportent à part, dans un fichier `.ariavault` entièrement chiffré (scrypt + AES-256-GCM). Sans la phrase de passe, rien n'y est lisible.
+- Les **réglages d'Aria** (fournisseur, domaine, e-mail, identifiants DNS) s'exportent à part, dans un fichier `.ariavault` entièrement chiffré (scrypt + AES-256-GCM) par une phrase de passe de 12 caractères minimum. Sans elle, rien n'y est lisible ; un fichier exporté avant, avec une phrase plus courte, s'importe toujours.
 
 ## Où sont tes données
 
@@ -257,7 +257,7 @@ Ce qui se recrée tout seul reste dans `%LOCALAPPDATA%\AriaVault` : Vaultwarden 
 - **Le coffre ne tourne que pendant ta session Windows.** Session fermée ou PC en veille : ton téléphone garde sa copie hors ligne et se resynchronise au retour.
 - **IPv4 uniquement** pour la publication automatique de l'adresse.
 - **L'exe n'est pas encore signé** : vérifie l'empreinte SHA-256 et l'attestation publiées avec chaque release.
-- Si tu importes un ancien coffre qui contient un `config.json` écrit par le panneau `/admin`, ses réglages priment sur ceux d'Aria. Le journal te le signale.
+- Si tu importes un ancien coffre qui contient un `config.json` écrit par le panneau `/admin`, ses réglages priment sur ceux d'Aria. Le journal te le signale. Seule exception : `admin_token` et `disable_admin_token` en sont retirés (à l'import, à la restauration et à chaque lancement), pour que le panneau `/admin` reste fermé.
 - Projet personnel, sans audit de sécurité indépendant.
 
 ## Provenance des composants
@@ -324,6 +324,6 @@ src/
 
 ## Licence
 
-Code d'Aria Vault sous licence [MIT](LICENSE). Les composants embarqués gardent leur propre licence : Vaultwarden sous AGPL-3.0, l'interface web sous GPL-3.0. Leurs textes complets sont dans le zip de chaque release, la liste complète dans [LICENCES-TIERS.txt](LICENCES-TIERS.txt).
+Code d'Aria Vault sous licence [MIT](LICENSE). Les composants embarqués gardent leur propre licence : Vaultwarden sous AGPL-3.0, l'interface web sous GPL-3.0. Leurs textes complets sont dans le zip de chaque release, la liste complète dans [LICENCES-TIERS.txt](LICENCES-TIERS.txt). Chaque release joint aussi les sources exactes du Vaultwarden embarqué (`vaultwarden-<version>-sources.tar.gz`, archive du tag compilé), avec leur empreinte SHA-256 dans les notes de la release.
 
 Aria Vault n'est ni affilié ni approuvé par le projet Vaultwarden, ni par Bitwarden, Inc.

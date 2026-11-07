@@ -3,7 +3,7 @@ package demarrage
 import "testing"
 
 func TestCommandeEtExe(t *testing.T) {
-	exe := `C:\Users\Jérémy Z\Desktop\Aria Vault\Aria-Vault.exe`
+	exe := `C:\Users\Zoé Martin\Desktop\Aria Vault\Aria-Vault.exe`
 	cmd := Commande(exe, "--silencieux")
 	if cmd != `"`+exe+`" --silencieux` {
 		t.Errorf("commande = %s", cmd)

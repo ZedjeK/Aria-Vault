@@ -81,7 +81,7 @@ sequenceDiagram
 - **La vraie IP du client** est transmise à Vaultwarden : son limiteur de tentatives de connexion fonctionne normalement.
 - **Le domaine pointe vers l'adresse privée du PC** (`192.168.x.x`). Le coffre n'est donc joignable que depuis le réseau local, ou par le VPN de l'utilisateur. Aucun port n'est ouvert sur la box.
 - **Vaultwarden est rattaché à un « job » Windows** (`vaultwarden/child_windows.go`) : si Aria se ferme ou plante, Windows l'arrête avec elle.
-- **Vaultwarden est configuré uniquement par variables d'environnement**, et seule une liste blanche de variables du système lui est transmise : une variable `ADMIN_TOKEN` ou `DATABASE_URL` traînant dans la session ne peut pas le reconfigurer. Le panneau `/admin` reste fermé.
+- **Vaultwarden est configuré uniquement par variables d'environnement**, et seule une liste blanche de variables du système lui est transmise : une variable `ADMIN_TOKEN` ou `DATABASE_URL` traînant dans la session ne peut pas le reconfigurer. Le panneau `/admin` reste fermé : un `data\config.json` venu d'un ancien coffre ou d'une sauvegarde est débarrassé de `admin_token` et `disable_admin_token` avant chaque lancement, et Vaultwarden ne démarre pas si ce fichier est illisible.
 
 ## Le certificat : DNS-01
 

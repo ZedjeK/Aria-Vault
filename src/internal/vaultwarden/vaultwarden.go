@@ -138,7 +138,16 @@ func (s *Server) Start(opts Options, logf func(string, ...any)) error {
 	}
 
 	// data\config.json est écrit par le panneau /admin : ses valeurs priment
-	// sur celles qu'Aria transmet. Mieux vaut le savoir.
+	// sur celles qu'Aria transmet. Un jeton admin venu d'un coffre importé ou
+	// d'une sauvegarde rouvrirait /admin à travers le HTTPS : il est retiré à
+	// chaque lancement, et Vaultwarden ne démarre pas si c'est impossible.
+	retirees, err := FermerAdmin(s.donnees)
+	if err != nil {
+		return err
+	}
+	if len(retirees) > 0 {
+		logf("%s", MessageAdminFerme(retirees))
+	}
 	if _, err := os.Stat(filepath.Join(s.donnees, "config.json")); err == nil {
 		logf("Attention : data\\config.json existe, ses réglages priment sur ceux d'Aria")
 	}

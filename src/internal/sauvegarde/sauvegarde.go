@@ -91,7 +91,8 @@ func Creer(donnees, dest string, now time.Time, phrase string) (Info, error) {
 		return Info{}, ErrPasDeCoffre
 	}
 	if phrase != "" {
-		if err := chiffre.VerifierPhrase(phrase); err != nil {
+		// Phrase enregistrée sur ce PC, peut-être avec l'ancien minimum.
+		if err := chiffre.VerifierPhraseEnregistree(phrase); err != nil {
 			return Info{}, err
 		}
 	}
