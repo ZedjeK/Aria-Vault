@@ -94,7 +94,7 @@ func TestDeplacer(t *testing.T) {
 	t.Setenv("OneDrive", "")
 	t.Setenv("OneDriveConsumer", "")
 	t.Setenv("OneDriveCommercial", "")
-	profil := filepath.Join(racine, "zeman")
+	profil := filepath.Join(racine, "camille")
 	os.MkdirAll(profil, 0o700)
 	cache := In(filepath.Join(racine, "Local", Dossier))
 	fichier(t, filepath.Join(cache.Base, "data", "db.sqlite3"), "coffre")
@@ -140,7 +140,7 @@ func TestDeplacer(t *testing.T) {
 func TestDeplacerReprise(t *testing.T) {
 	racine := t.TempDir()
 	t.Setenv("OneDrive", "")
-	profil := filepath.Join(racine, "zeman")
+	profil := filepath.Join(racine, "camille")
 	cache := In(filepath.Join(racine, "Local", Dossier))
 	fichier(t, filepath.Join(cache.Base, "config.json"), "{}")
 	etape := filepath.Join(profil, DossierDonnees+".migration")
@@ -161,7 +161,7 @@ func TestDeplacerReprise(t *testing.T) {
 func TestDeplacerPremiereInstallation(t *testing.T) {
 	racine := t.TempDir()
 	t.Setenv("OneDrive", "")
-	profil := filepath.Join(racine, "zeman")
+	profil := filepath.Join(racine, "camille")
 	cache := In(filepath.Join(racine, "Local", Dossier))
 	p, msg, err := Deplacer(profil, cache)
 	if err != nil || msg != "" || p.Base != filepath.Join(profil, DossierDonnees) || !existe(p.Base) {
@@ -171,7 +171,7 @@ func TestDeplacerPremiereInstallation(t *testing.T) {
 
 func TestDeplacerRefuseOneDrive(t *testing.T) {
 	racine := t.TempDir()
-	profil := filepath.Join(racine, "zeman")
+	profil := filepath.Join(racine, "camille")
 	t.Setenv("OneDrive", profil)
 	cache := In(filepath.Join(racine, "Local", Dossier))
 	if p, _, err := Deplacer(profil, cache); err == nil || p != cache {
