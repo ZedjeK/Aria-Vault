@@ -86,6 +86,11 @@ func (s *VaultService) Backup() (sauvegarde.Info, error) {
 			s.j.Add(journal.Erreur, "Sauvegarde impossible : %v", err)
 			return sauvegarde.Info{}, err
 		}
+		// Phrase choisie avec l'ancien minimum : la sauvegarde se fait quand
+		// même, on invite seulement à en choisir une plus longue.
+		if chiffre.VerifierPhrase(phrase) != nil {
+			s.j.Add(journal.Info, "Ta phrase des sauvegardes fait moins de %d caractères : choisis-en une plus longue avec « Changer la phrase… » (les anciennes sauvegardes restent lisibles avec l'ancienne)", chiffre.PhraseMin)
+		}
 	}
 
 	enLigne := s.pauseServeur("sauvegarde")

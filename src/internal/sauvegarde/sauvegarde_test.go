@@ -265,6 +265,29 @@ func TestSauvegardeChiffree(t *testing.T) {
 	}
 }
 
+// Une phrase de 8 caractères, choisie quand c'était le minimum : les
+// sauvegardes quotidiennes continuent, et elles se restaurent toujours.
+func TestSauvegardeAnciennePhrase(t *testing.T) {
+	racine := t.TempDir()
+	data := filepath.Join(racine, "data")
+	fauxCoffre(t, data, "ANCIEN")
+	dest := filepath.Join(racine, "svg")
+	const ancienne = "huit car"
+
+	info, err := Creer(data, dest, time.Date(2026, 10, 29, 9, 0, 0, 0, time.Local), ancienne)
+	if err != nil {
+		t.Fatalf("phrase enregistrée de 8 caractères refusée : %v", err)
+	}
+	os.RemoveAll(data)
+	fauxCoffre(t, data, "NOUVEAU")
+	if _, err := Restaurer(info.Chemin, data, time.Now(), ancienne); err != nil {
+		t.Fatalf("ancienne sauvegarde impossible à restaurer : %v", err)
+	}
+	if b, _ := os.ReadFile(filepath.Join(data, "db.sqlite3")); string(b) != "base ANCIEN" {
+		t.Errorf("base restaurée = %q", b)
+	}
+}
+
 func TestReparer(t *testing.T) {
 	// Coupure après la mise de côté de l'ancien coffre : le nouveau, prêt, est installé.
 	racine := t.TempDir()
