@@ -65,6 +65,8 @@ func TestUntarRefuseLesEvasions(t *testing.T) {
 
 func TestEnvironment(t *testing.T) {
 	t.Setenv("ADMIN_TOKEN", "hérité")
+	t.Setenv("ADMIN_TOKEN_FILE", `C:\jeton.txt`)
+	t.Setenv("CONFIG_FILE", "autre-config.json")
 	t.Setenv("SIGNUPS_ALLOWED", "true")
 	t.Setenv("DISABLE_ADMIN_TOKEN", "true")
 	t.Setenv("IP_HEADER", "X-Client-IP")
@@ -80,7 +82,7 @@ func TestEnvironment(t *testing.T) {
 		}
 		return v, n
 	}
-	for _, k := range []string{"ADMIN_TOKEN", "DISABLE_ADMIN_TOKEN", "IP_HEADER"} {
+	for _, k := range []string{"ADMIN_TOKEN", "ADMIN_TOKEN_FILE", "DISABLE_ADMIN_TOKEN", "CONFIG_FILE", "IP_HEADER"} {
 		if _, n := get(k); n != 0 {
 			t.Errorf("%s hérité de la session doit être écarté", k)
 		}

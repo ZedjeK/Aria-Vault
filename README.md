@@ -257,7 +257,7 @@ Ce qui se recrée tout seul reste dans `%LOCALAPPDATA%\AriaVault` : Vaultwarden 
 - **Le coffre ne tourne que pendant ta session Windows.** Session fermée ou PC en veille : ton téléphone garde sa copie hors ligne et se resynchronise au retour.
 - **IPv4 uniquement** pour la publication automatique de l'adresse.
 - **L'exe n'est pas encore signé** : vérifie l'empreinte SHA-256 et l'attestation publiées avec chaque release.
-- Si tu importes un ancien coffre qui contient un `config.json` écrit par le panneau `/admin`, ses réglages priment sur ceux d'Aria. Le journal te le signale.
+- Si tu importes un ancien coffre qui contient un `config.json` écrit par le panneau `/admin`, ses réglages priment sur ceux d'Aria. Le journal te le signale. Seule exception : `admin_token` et `disable_admin_token` en sont retirés (à l'import, à la restauration et à chaque lancement), pour que le panneau `/admin` reste fermé.
 - Projet personnel, sans audit de sécurité indépendant.
 
 ## Provenance des composants

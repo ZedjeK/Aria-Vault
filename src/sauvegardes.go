@@ -21,6 +21,7 @@ import (
 	"aria-vault/internal/moteur"
 	"aria-vault/internal/paths"
 	"aria-vault/internal/sauvegarde"
+	"aria-vault/internal/vaultwarden"
 )
 
 // ErrDossierNonChoisi : aucune sauvegarde tant qu'aucun dossier n'est choisi.
@@ -220,6 +221,14 @@ func (s *VaultService) remplacerCoffre(titre string, fn func(time.Time) (string,
 		s.j.Add(journal.Info, "Ancien coffre mis de côté : %s", ancien)
 	}
 	s.j.Add(journal.OK, "%s terminée", titre)
+	// Un config.json venu de l'ancien coffre ou de la sauvegarde ne doit pas
+	// rouvrir /admin. Vaultwarden refait la vérification à chaque lancement et
+	// refuse de démarrer si elle échoue.
+	if retirees, err := vaultwarden.FermerAdmin(s.p.Donnees); err != nil {
+		s.j.Add(journal.Erreur, "%v", err)
+	} else if len(retirees) > 0 {
+		s.j.Add(journal.OK, "%s", vaultwarden.MessageAdminFerme(retirees))
+	}
 	// Après une restauration, le serveur repart s'il est configuré, même s'il était arrêté.
 	s.repriseServeur(enLigne || s.moteur.Configure())
 	return nil
