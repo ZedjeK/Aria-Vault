@@ -44,7 +44,9 @@ jobs:
       SIGNPATH_ACTIF: ${{ secrets.SIGNPATH_API_TOKEN != '' }}
 
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
 
       - name: Lire la version d'Aria
         id: aria
@@ -76,8 +78,9 @@ jobs:
       # ------------------------------------------------------------------
       # Vaultwarden, depuis le source officiel
       # ------------------------------------------------------------------
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with:
+          persist-credentials: false
           repository: dani-garcia/vaultwarden
           ref: ${{ steps.vw.outputs.version }}
           path: vw-src
@@ -109,13 +112,14 @@ jobs:
           "nom=$nom" | Out-File $env:GITHUB_OUTPUT -Append
           "sha=$sha" | Out-File $env:GITHUB_OUTPUT -Append
 
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
         with:
+          toolchain: stable
           targets: x86_64-pc-windows-msvc
 
       - name: Cache vcpkg
         id: cache-vcpkg
-        uses: actions/cache@v4
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: C:\vcpkg\installed
           key: vcpkg-openssl-x64-windows-static-v1
@@ -125,7 +129,7 @@ jobs:
         run: vcpkg install openssl:x64-windows-static
 
       - name: Cache cargo
-        uses: actions/cache@v4
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: |
             ~/.cargo/registry
@@ -166,13 +170,13 @@ jobs:
       # ------------------------------------------------------------------
       # Toujours le dernier correctif de Go 1.26 : la bibliothèque standard
       # (net/http, crypto/tls…) fait tourner le relais HTTPS d'Aria.
-      - uses: actions/setup-go@v6
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
         with:
           go-version: "1.26.x"
           check-latest: true
           cache-dependency-path: src/go.sum
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 22
           cache: npm
@@ -193,7 +197,7 @@ jobs:
       - name: Préparer l'exe à signer
         id: asigner
         if: env.SIGNPATH_ACTIF == 'true' && inputs.release != 'aucune'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: a-signer
           path: Aria-Vault.exe
@@ -201,7 +205,7 @@ jobs:
 
       - name: Signer avec SignPath
         if: env.SIGNPATH_ACTIF == 'true' && inputs.release != 'aucune'
-        uses: signpath/github-action-submit-signing-request@v1
+        uses: signpath/github-action-submit-signing-request@ced31329c0317e779dad2eec2a7c3bb46ea1343e # v1.3
         with:
           api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
           organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
@@ -251,14 +255,14 @@ jobs:
           "exe=$sha" | Out-File $env:GITHUB_OUTPUT -Append
           "zip=$zsha" | Out-File $env:GITHUB_OUTPUT -Append
 
-      - uses: actions/attest-build-provenance@v2
+      - uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2.4.0
         with:
           subject-path: |
             dist/Aria-Vault.exe
             release/*.zip
             release/*.tar.gz
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: Aria-Vault-${{ steps.aria.outputs.version }}-vw${{ steps.vw.outputs.version }}
           path: dist/
