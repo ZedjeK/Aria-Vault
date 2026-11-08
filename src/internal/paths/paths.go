@@ -1,14 +1,19 @@
 // Package paths centralise les emplacements d'Aria Vault.
 //
-// Depuis la v0.8, ce qui compte (le coffre, les certificats, les réglages, le
-// journal) vit dans %USERPROFILE%\.Aria-Vault, et ce qui se recrée tout seul
-// (Vaultwarden extrait, cache de l'interface, fichier de relève) reste dans
-// %LOCALAPPDATA%\AriaVault. Les deux sont propres au compte Windows : Aria
-// tourne avec les droits de l'utilisateur, jamais en administrateur.
+// Tout vit dans %USERPROFILE%\.Aria-Vault, comme pour les autres applis Aria :
+// ce qui compte (le coffre, les certificats, les réglages, le journal) à la
+// racine, et ce qui se recrée tout seul (Vaultwarden extrait, cache de
+// l'interface, fichier de relève, mises à jour téléchargées) dans cache\.
+// Aria tourne avec les droits de l'utilisateur, jamais en administrateur.
 //
 // Migrations automatiques au lancement :
 //   - v0.3 et avant : %LOCALAPPDATA%\AriaVaultwarden → %LOCALAPPDATA%\AriaVault ;
-//   - v0.7 et avant : données de %LOCALAPPDATA%\AriaVault → %USERPROFILE%\.Aria-Vault.
+//   - v0.7 et avant : données de %LOCALAPPDATA%\AriaVault → %USERPROFILE%\.Aria-Vault ;
+//   - v0.8 : le cache quitte %LOCALAPPDATA%\AriaVault pour .Aria-Vault\cache
+//     (rien à déplacer : il se recrée, l'ancien est effacé).
+//
+// Si .Aria-Vault est inutilisable (synchronisé par OneDrive, par exemple),
+// données et cache restent ensemble dans %LOCALAPPDATA%\AriaVault.
 package paths
 
 import (
@@ -22,7 +27,7 @@ import (
 // Paths regroupe les dossiers et fichiers utilisés par Aria.
 type Paths struct {
 	Base        string // %USERPROFILE%\.Aria-Vault : données de l'utilisateur
-	Cache       string // %LOCALAPPDATA%\AriaVault : ce qui se recrée tout seul
+	Cache       string // %USERPROFILE%\.Aria-Vault\cache : ce qui se recrée tout seul
 	Moteur      string // vaultwarden.exe et web-vault, réextraits à chaque démarrage
 	Donnees     string // le coffre : base SQLite, clés RSA, pièces jointes
 	Certificats string // certificat Let's Encrypt et compte ACME
@@ -33,6 +38,7 @@ const (
 	Dossier        = "AriaVault"       // cache, dans %LOCALAPPDATA%
 	AncienDossier  = "AriaVaultwarden" // v0.3 et avant
 	DossierDonnees = ".Aria-Vault"     // données, dans %USERPROFILE% (v0.8)
+	SousCache      = "cache"           // cache, dans .Aria-Vault (v0.9)
 )
 
 // Racine renvoie le dossier parent (%LOCALAPPDATA% sous Windows).
@@ -133,7 +139,7 @@ func Deplacer(profil string, cache Paths) (Paths, string, error) {
 		return cache, "", fmt.Errorf("%s est synchronisé par OneDrive : les données restent dans %s", nouveau, cache.Base)
 	}
 	if existe(nouveau) {
-		return Avec(nouveau, cache.Base), "", nil
+		return Avec(nouveau, filepath.Join(nouveau, SousCache)), "", nil
 	}
 
 	elements := append([]string(nil), aDeplacer...)
@@ -165,9 +171,31 @@ func Deplacer(profil string, cache Paths) (Paths, string, error) {
 		return cache, "", fmt.Errorf("finalisation de %s impossible (reprise au prochain lancement) : %w", nouveau, err)
 	}
 	if len(deplaces) == 0 {
-		return Avec(nouveau, cache.Base), "", nil // première installation
+		return Avec(nouveau, filepath.Join(nouveau, SousCache)), "", nil // première installation
 	}
-	return Avec(nouveau, cache.Base), fmt.Sprintf("Données d'Aria déplacées : %s → %s", cache.Base, nouveau), nil
+	return Avec(nouveau, filepath.Join(nouveau, SousCache)), fmt.Sprintf("Données d'Aria déplacées : %s → %s", cache.Base, nouveau), nil
+}
+
+// regenerables : ce que l'ancien cache (%LOCALAPPDATA%\AriaVault) contenait et
+// qui se recrée tout seul dans .Aria-Vault\cache.
+var regenerables = []string{"moteur", "webview", "maj", "instance.json"}
+
+// NettoyerAncienCache efface de l'ancien cache ce qui se recrée tout seul, puis
+// le dossier s'il est vide. Rien d'autre n'est jamais touché : une donnée qui
+// n'aurait pas pu être déplacée y reste. Renvoie ce qui a été effacé.
+func NettoyerAncienCache(ancien string) []string {
+	var effaces []string
+	for _, e := range regenerables {
+		p := filepath.Join(ancien, e)
+		if !existe(p) {
+			continue
+		}
+		if err := os.RemoveAll(p); err == nil {
+			effaces = append(effaces, e)
+		}
+	}
+	_ = os.Remove(ancien) // seulement s'il est vide
+	return effaces
 }
 
 // Existant renvoie p, ou son plus proche parent qui existe ("" si aucun).
